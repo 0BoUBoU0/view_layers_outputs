@@ -25,7 +25,7 @@ bl_info = {
     "warning": "",
     "category": "View Layers",
     "blender": (3,6,0),
-    "version": (1,4,1)
+    "version": (1,4,3)
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -90,31 +90,29 @@ class VLOUTPUT_properties (bpy.types.PropertyGroup):
     outputs_prefix : bpy.props.StringProperty(name="Pass Prefix",default="",description="")
     layer_folder : bpy.props.BoolProperty (default=True,name="One folder per layer",description="if checked, images sequences of each layer will be stored in a different folder")
     outputs_folder : bpy.props.BoolProperty (default=False,name="One folder per output",description="if checked, images sequences of each passes will be stored in folders")    
-    vloutputs_corresponding : bpy.props.StringProperty(name="Translation",default="Image=rgba",description='translate field a to field b, separated by ",". I.E. "Image=rgba,Alpha=alpha"')
+    corresponding : bpy.props.StringProperty(name="Translation",default="Image=rgba",description='translate field a to field b, separated by ",". I.E. "Image=rgba,Alpha=alpha"')
     clear_unusedSockets : bpy.props.BoolProperty (default=False,name="Clear Unused Output",description="if checked, clear user unused outputs")
     use_layerName_in_pass : bpy.props.BoolProperty (default=False,name="Use Layer Name",description="if checked, the view layer name will be added in each pass name")
     change_only_node_output : bpy.props.BoolProperty (default=False,name="Change Only Node Path",description="if checked, will only change in the node output path, without touching the base path")
     del_x_signs : bpy.props.IntProperty (default=0,name="Delete X First Signs",description="")
 
-    vloutputs_pathtochange_options = [("Base Path","Base Path","base path from the main output",0),
+    path_to_change_options = [("Base Path","Base Path","base path from the main output",0),
                             ("Subpath","Subpath","subpath for all outputs of a node output",1)
                             ]
-    vloutputs_pathtochange : bpy.props.EnumProperty (items = vloutputs_pathtochange_options,name = "Path to Change",description = "choose selection type",default=1)
-    vloutputs_basepath_checkbox : bpy.props.BoolProperty (default=True,name="",description="")
-    vloutputs_subpath_checkbox : bpy.props.BoolProperty (default=False,name="",description="")
+    path_to_change : bpy.props.EnumProperty (items = path_to_change_options,name = "Path to Change",description = "choose selection type",default=1)
     
-    #vloutputs_basepath_prop: bpy.props.BoolProperty(default=False, name="", description='')
-    vloutputs_basepath_previs: bpy.props.StringProperty(default="", name="", description='')
-    #vloutputs_subpath_prop: bpy.props.BoolProperty(default=True, name="", description='')
-    vloutputs_subpath_previs: bpy.props.StringProperty(default="[Layer Name]**\\**[Pass Name]**\\", name="Output previs", description='output path')
-    vloutputs_customfield_a: bpy.props.StringProperty(default="", name="", description='First user custom field (A)')
-    vloutputs_customfield_b: bpy.props.StringProperty(default="", name="", description='Second user custom field (B)')
-    vloutputs_customfield_c: bpy.props.StringProperty(default="", name="", description='Third user custom field (C)')
-    vloutputs_pathlength : bpy.props.IntProperty(default=0, name="", description='')
-    vloutputs_postscript_checkbox : bpy.props.BoolProperty (default=False,name="",description="launch this script after action it")
-    vloutputs_postscript : bpy.props.PointerProperty (type=bpy.types.Text, name="Additional Script", description="script to launch after the nodes creation")
-    vloutputs_fileformat_checkbox : bpy.props.BoolProperty (default=False,name="",description="if checked, will use custom image type. If unchecked, will use the scene output file's type")
-    vloutputs_fileformat_options = [ #'BMP', 'IRIS', 'PNG', 'JPEG', 'JPEG2000', 'TARGA', 'TARGA_RAW', 'CINEON', 'DPX', 'OPEN_EXR_MULTILAYER', 'OPEN_EXR', 'HDR', 'TIFF', 'WEBP'
+    #basepath_prop: bpy.props.BoolProperty(default=False, name="", description='')
+    basepath_previs: bpy.props.StringProperty(default="", name="", description='')
+    #subpath_prop: bpy.props.BoolProperty(default=True, name="", description='')
+    subpath_previs: bpy.props.StringProperty(default="[Layer Name]**\\**[Pass Name]**\\", name="Output previs", description='output path')
+    customfield_a: bpy.props.StringProperty(default="", name="", description='First user custom field (A)')
+    customfield_b: bpy.props.StringProperty(default="", name="", description='Second user custom field (B)')
+    customfield_c: bpy.props.StringProperty(default="", name="", description='Third user custom field (C)')
+    pathlength : bpy.props.IntProperty(default=0, name="", description='')
+    postscript_checkbox : bpy.props.BoolProperty (default=False,name="",description="launch this script after action it")
+    postscript : bpy.props.PointerProperty (type=bpy.types.Text, name="Additional Script", description="script to launch after the nodes creation")
+    fileformat_checkbox : bpy.props.BoolProperty (default=False,name="",description="if checked, will use custom image type. If unchecked, will use the scene output file's type")
+    fileformat_options = [ #'BMP', 'IRIS', 'PNG', 'JPEG', 'JPEG2000', 'TARGA', 'TARGA_RAW', 'CINEON', 'DPX', 'OPEN_EXR_MULTILAYER', 'OPEN_EXR', 'HDR', 'TIFF', 'WEBP'
                             ('BMP','BMP','BMP',0),
                             ('IRIS','IRIS','IRIS',1),
                             ('PNG','PNG','PNG',2),
@@ -130,7 +128,7 @@ class VLOUTPUT_properties (bpy.types.PropertyGroup):
                             ('TIFF','TIFF','TIFF',12),
                             ('WEBP','WEBP','WEBP',13),
                             ]
-    vloutputs_fileformat : bpy.props.EnumProperty (items = vloutputs_fileformat_options,name = "Node Output Image Type",description = "choose image type",default=2)
+    fileformat : bpy.props.EnumProperty (items = fileformat_options,name = "Node Output Image Type",description = "choose image type",default=2)
 
     ## precomp
     precomp_bg_under : bpy.props.BoolProperty(default=False,name="",description="")
@@ -161,7 +159,7 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         ## update box
         uptbox = layout.box()
         split = uptbox.split(factor=.85, align = True)
-        if vloutputs_props.vloutputs_pathlength>=64:
+        if vloutputs_props.pathlength>=64:
             text = "Cannot update (subpath too long)"
             icon = "STRIP_COLOR_01"
         else:
@@ -170,21 +168,23 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         split.operator("vloutputs.createnodesoutput",text=text,emboss=True,depress=False,icon=icon)
         split.prop(vloutputs_props, "outputs_reset_selection")
         ## path selection
-        outputs_basepathprevis = vloutputs_props.vloutputs_basepath_previs.replace("**", "")
-        outputs_subpathprevis = vloutputs_props.vloutputs_subpath_previs.replace("**", "")
+        outputs_basepathprevis = vloutputs_props.basepath_previs.replace("**", "")
+        outputs_subpathprevis = vloutputs_props.subpath_previs.replace("**", "")
         pathbox = layout.box()
         ## box for each path
+        row = pathbox.row()
+        row.prop(vloutputs_props,"path_to_change",expand=True)
         row = pathbox.row()
         colA = row.column()
         bpbox = colA.box()
         colB = row.column()
         subbox = colB.box()
-        if vloutputs_props.vloutputs_pathtochange == "Base Path": 
+        if vloutputs_props.path_to_change == "Base Path": 
             bpbox.active = True
             subbox.active = False
             base_icon = "FOLDER_REDIRECT"
             sub_icon = "BLANK1"
-        elif vloutputs_props.vloutputs_pathtochange == "Subpath": 
+        elif vloutputs_props.path_to_change == "Subpath": 
             bpbox.active = False
             subbox.active = True
             base_icon = "BLANK1"
@@ -195,25 +195,25 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         #split = row.split(factor=.1)
         add_user = f" [+] {outputs_basepathprevis}" if outputs_basepathprevis != "" else ""
         split.label(icon=base_icon,text=f"Base_Path: {get_base_path(bpy.context.scene)}{add_user}")
-        if vloutputs_props.vloutputs_pathtochange == "Base Path": 
+        if vloutputs_props.path_to_change == "Base Path": 
             split.operator('vloutputs.dellastcharacter', text="", icon="TRIA_LEFT_BAR")
-        chgbox = colA.box()
-        chgbox.prop(vloutputs_props, "vloutputs_pathtochange")
+        bprow = bpbox.row()
+        bprow.label(text="")
 
         ## subpath box
         row = subbox.row()
         split = row.split(align=True, factor=0.9)
         split.label(icon=sub_icon,text=f"Subpath: {outputs_subpathprevis}")
-        if vloutputs_props.vloutputs_pathtochange == "Subpath": 
+        if vloutputs_props.path_to_change == "Subpath": 
             split.operator('vloutputs.dellastcharacter', text="", icon="TRIA_LEFT_BAR")
         row = subbox.row()
-        if vloutputs_props.vloutputs_pathlength>=64:
+        if vloutputs_props.pathlength>=64:
             str_check = "too long !!"
             icon = "STRIP_COLOR_01"
         else:
             str_check = "ok"
             icon = "STRIP_COLOR_04"
-        row.label(icon=icon,text=f"length : {vloutputs_props.vloutputs_pathlength} on 64 ( {str_check} )")
+        row.label(icon=icon,text=f"length : {vloutputs_props.pathlength} on 64 ( {str_check} )")
 
         ## fields options
         box = layout.box()
@@ -273,14 +273,14 @@ class VLOUTPUT_PT_filesoutputfieldsoptions(bpy.types.Panel):
         row = box.row()
         split = row.split(factor=2/5)
         split.operator('vloutputs.add_character_enum', text="Custom A").character = "[Custom A]"
-        split.prop(vloutputs_props, "vloutputs_customfield_a",text="" )
+        split.prop(vloutputs_props, "customfield_a",text="" )
         split = row.split(factor=2/5)
         split.operator('vloutputs.add_character_enum', text="Custom B").character = "[Custom B]"
-        split.prop(vloutputs_props, "vloutputs_customfield_b",text="" )
+        split.prop(vloutputs_props, "customfield_b",text="" )
         row = box.row()
         split = row.split(factor=2/5)
         split.operator('vloutputs.add_character_enum', text="Custom C").character = "[Custom C]"
-        split.prop(vloutputs_props, "vloutputs_customfield_c",text="" )
+        split.prop(vloutputs_props, "customfield_c",text="" )
         split = row.split(factor=2/5)
         split.label(text="")
         split.label(text="")
@@ -322,15 +322,15 @@ class VLOUTPUT_PT_filesoutputoptions(bpy.types.Panel):
         row = box.row()
         row.prop(vloutputs_props, "outputs_alpha_solo")
         split = row.split(factor = .05)
-        split.active = vloutputs_props.vloutputs_fileformat_checkbox
-        split.prop(vloutputs_props, "vloutputs_fileformat_checkbox")
-        split.prop(vloutputs_props, "vloutputs_fileformat")
+        split.active = vloutputs_props.fileformat_checkbox
+        split.prop(vloutputs_props, "fileformat_checkbox")
+        split.prop(vloutputs_props, "fileformat")
         # add script
         box = layout.box()
-        box.active = vloutputs_props.vloutputs_postscript_checkbox
+        box.active = vloutputs_props.postscript_checkbox
         split = box.split(factor=.05)
-        split.prop(vloutputs_props, "vloutputs_postscript_checkbox")
-        split.prop(vloutputs_props, "vloutputs_postscript")
+        split.prop(vloutputs_props, "postscript_checkbox")
+        split.prop(vloutputs_props, "postscript")
 
 class VLOUTPUT_PT_precomptree(bpy.types.Panel):
     bl_label = f"Create Precomp Tree "
@@ -502,11 +502,11 @@ def create_renderlayers_nodes(selected_scene,selected_scene_layer_list):
     return output_enabled_dict
 
 # function to grab all informations given by the user regarding the name of the layers
-def vloutputs_nodes_paths(layername,outputname,outputpath,del_signs):
+def nodes_paths(layername,outputname,outputpath,del_signs):
     scene = bpy.context.scene
     vloutput_path = outputpath
     del_x_signs = bpy.context.scene.vloutputs_props.del_x_signs
-    vloutputs_corresponding = bpy.context.scene.vloutputs_props.vloutputs_corresponding
+    corresponding = bpy.context.scene.vloutputs_props.corresponding
     output_split = vloutput_path.split("**")
     #print(f"{output_split=}")
     vloutput_filepath = ""
@@ -524,11 +524,11 @@ def vloutputs_nodes_paths(layername,outputname,outputpath,del_signs):
         elif elem == "[Camera Name]":
             elem = scene.camera.name if scene.camera else ""
         elif elem == "[Custom A]":
-            elem = scene.vloutputs_props.vloutputs_customfield_a
+            elem = scene.vloutputs_props.customfield_a
         elif elem == "[Custom B]":
-            elem = scene.vloutputs_props.vloutputs_customfield_b
+            elem = scene.vloutputs_props.customfield_b
         elif elem == "[Custom C]":
-            elem = scene.vloutputs_props.vloutputs_customfield_c
+            elem = scene.vloutputs_props.customfield_c
         elif elem == "[File Version]":
             if 'Snapshots_History' in bpy.data.texts.keys():
                 snap_history = bpy.data.texts['Snapshots_History'].lines[0].body
@@ -551,7 +551,7 @@ def vloutputs_nodes_paths(layername,outputname,outputpath,del_signs):
 
         clean_filepath = vloutput_filepath.replace("\\\\", "\\").replace("\\//", "\\").replace("////", "//") # clean to avoid dirty things 
         # change names regarding the translation dic (Image=rgba, etc)
-        outputs_corresponding_list = vloutputs_corresponding.split(',')
+        outputs_corresponding_list = corresponding.split(',')
         outputs_corresponding_dict = {}
         for corres in outputs_corresponding_list:
             corres = corres.replace(" ","")
@@ -566,7 +566,7 @@ def vloutputs_nodes_paths(layername,outputname,outputpath,del_signs):
         complete_filepath = clean_filepath[del_x_signs:]
     else:
         complete_filepath = clean_filepath
-    scene.vloutputs_props.vloutputs_pathlength = len(complete_filepath)
+    scene.vloutputs_props.pathlength = len(complete_filepath)
     return complete_filepath
 
 def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_dict):
@@ -575,11 +575,11 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
     selected_scene_layer_list = selected_scene_layer_list
     output_enabled_dict = output_enabled_dict
     compo_tree = bpy.data.scenes[selected_scene.name].node_tree
-    vloutputs_corresponding = bpy.context.scene.vloutputs_props.vloutputs_corresponding
+    corresponding = bpy.context.scene.vloutputs_props.corresponding
     clear_unusedSockets = bpy.context.scene.vloutputs_props.clear_unusedSockets
     outputs_reset_selection = bpy.context.scene.vloutputs_props.outputs_reset_selection
-    vloutputs_fileformat_checkbox = bpy.context.scene.vloutputs_props.vloutputs_fileformat_checkbox
-    vloutputs_fileformat = bpy.context.scene.vloutputs_props.vloutputs_fileformat
+    fileformat_checkbox = bpy.context.scene.vloutputs_props.fileformat_checkbox
+    fileformat = bpy.context.scene.vloutputs_props.fileformat
     outputs_alpha_solo = bpy.context.scene.vloutputs_props.outputs_alpha_solo
     change_only_node_output = bpy.context.scene.vloutputs_props.change_only_node_output
     del_x_signs = bpy.context.scene.vloutputs_props.del_x_signs
@@ -587,7 +587,7 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
     bpy.data.scenes[selected_scene.name].use_nodes = True
 
     # change names regarding the translation dic (Image=rgba, etc)
-    outputs_corresponding_list = vloutputs_corresponding.split(',')
+    outputs_corresponding_list = corresponding.split(',')
     outputs_corresponding_dict = {}
     for corres in outputs_corresponding_list:
         corres = corres.replace(" ","")
@@ -608,8 +608,8 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
     #         main_file_output = f"{main_file_output}{separator}"
 
     # check output image type
-    if vloutputs_fileformat_checkbox:
-        file_format = vloutputs_fileformat
+    if fileformat_checkbox:
+        file_format = fileformat
     else:
         file_format = selected_scene.render.image_settings.file_format
 
@@ -621,9 +621,9 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
         output_node_name = f"File Output - {layer.name}"
 
         # update base_path
-        layer_basepath = main_file_output + vloutputs_nodes_paths(layer.name,"",bpy.context.scene.vloutputs_props.vloutputs_basepath_previs,False)
+        layer_basepath = main_file_output + nodes_paths(layer.name,"",bpy.context.scene.vloutputs_props.basepath_previs,False)
         
-        if bpy.context.scene.vloutputs_props.vloutputs_pathlength<=64:
+        if bpy.context.scene.vloutputs_props.pathlength<=64:
             # create output nodes if needed
             if outputs_reset_selection!="ONLY UPDATE PATHS":
                 # check if file output node exists
@@ -645,7 +645,7 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                 compo_tree.nodes[output_node_name].color = compo_tree.nodes[render_node_name].color # give the same color as render layer node
                 compo_tree.nodes[output_node_name].mute = compo_tree.nodes[render_node_name].mute # check if mute
                 compo_tree.nodes[output_node_name].format.file_format = file_format
-                if vloutputs_fileformat_checkbox:
+                if fileformat_checkbox:
                     if outputs_alpha_solo:
                         compo_tree.nodes[output_node_name].format.color_mode = 'RGB'
                     else:
@@ -673,7 +673,7 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                     # if output in outputs_corresponding_dict.keys():
                     #     output = outputs_corresponding_dict[output]
                     # create the outputs paths regarding user fields
-                    vloutput_path = vloutputs_nodes_paths(layer.name,output,bpy.context.scene.vloutputs_props.vloutputs_subpath_previs,True)
+                    vloutput_path = nodes_paths(layer.name,output,bpy.context.scene.vloutputs_props.subpath_previs,True)
                     #print(f"{vloutput_path=}")
 
                     # check if user wants to change the string
@@ -685,7 +685,7 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                     #print(f"{input_slot=}")
                     #print(f"{output_slot=}")
                     compo_tree.nodes[output_node_name].layer_slots.new(input_slot) # "." is for better readability in files
-                    if bpy.context.scene.vloutputs_props.vloutputs_pathlength<=64:
+                    if bpy.context.scene.vloutputs_props.pathlength<=64:
                         if bpy.context.scene.vloutputs_props.outputs_alpha_solo == True or bpy.context.scene.vloutputs_props.outputs_alpha_solo == False and output != "Alpha":
                             compo_tree.links.new(compo_tree.nodes[render_node_name].outputs[output_slot],compo_tree.nodes[output_node_name].inputs[input_slot])
             
@@ -697,7 +697,7 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                     # if input_slot in outputs_corresponding_dict.keys():
                     #     input_slot = outputs_corresponding_dict[input_slot]
                     # create the outputs paths regarding user fields
-                    vloutput_path = vloutputs_nodes_paths(layer.name,input_slot,bpy.context.scene.vloutputs_props.vloutputs_subpath_previs,True)
+                    vloutput_path = nodes_paths(layer.name,input_slot,bpy.context.scene.vloutputs_props.subpath_previs,True)
                     # check if user wants to change the string
                     # for string in outputs_corresponding_dict.keys():
                     #     if string in vloutput_path :
@@ -775,8 +775,8 @@ class VLOUTPUT_OT_createnodesoutput(bpy.types.Operator):
                 #print(" --- scene finished --- ")
 
             # use a user script if wanted
-            if bpy.context.scene.vloutputs_props.vloutputs_postscript_checkbox:
-                exec(bpy.context.scene.vloutputs_props.vloutputs_postscript.as_string())
+            if bpy.context.scene.vloutputs_props.postscript_checkbox:
+                exec(bpy.context.scene.vloutputs_props.postscript.as_string())
 
         print(f"\n {separator} {Addon_Name} Finished {separator} \n")
         return {"FINISHED"}
@@ -787,24 +787,24 @@ class VLOUTPUT_OT_dellastcharacter(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
     
     def execute(self, context):
-        # vloutputs_subpath_previs = context.scene.vloutputs_props.vloutputs_subpath_previs
-        # if vloutputs_subpath_previs != "":
-        #     output_split = vloutputs_subpath_previs.split("**")
-        #     context.scene.vloutputs_props.vloutputs_subpath_previs = "**".join(output_split[:-1])
+        # subpath_previs = context.scene.vloutputs_props.subpath_previs
+        # if subpath_previs != "":
+        #     output_split = subpath_previs.split("**")
+        #     context.scene.vloutputs_props.subpath_previs = "**".join(output_split[:-1])
 
 
 
         vloutputs_props = context.scene.vloutputs_props
         
-        if vloutputs_props.vloutputs_pathtochange == "Base Path":
-            if vloutputs_props.vloutputs_basepath_previs != "":
-                output_split = vloutputs_props.vloutputs_basepath_previs.split("**")
-                vloutputs_props.vloutputs_basepath_previs = "**".join(output_split[:-1])
+        if vloutputs_props.path_to_change == "Base Path":
+            if vloutputs_props.basepath_previs != "":
+                output_split = vloutputs_props.basepath_previs.split("**")
+                vloutputs_props.basepath_previs = "**".join(output_split[:-1])
 
-        elif vloutputs_props.vloutputs_pathtochange == "Subpath": 
-            if vloutputs_props.vloutputs_subpath_previs != "":
-                output_split = vloutputs_props.vloutputs_subpath_previs.split("**")
-                vloutputs_props.vloutputs_subpath_previs = "**".join(output_split[:-1])
+        elif vloutputs_props.path_to_change == "Subpath": 
+            if vloutputs_props.subpath_previs != "":
+                output_split = vloutputs_props.subpath_previs.split("**")
+                vloutputs_props.subpath_previs = "**".join(output_split[:-1])
 
         return {"FINISHED"}
 
@@ -824,10 +824,10 @@ class VLOUTPUT_OT_add_character_enum(bpy.types.Operator):
         return properties.tooltip
 
     def execute(self, context):
-        if context.scene.vloutputs_props.vloutputs_pathtochange == "Base Path": 
-            context.scene.vloutputs_props.vloutputs_basepath_previs += f"**{self.character}"
-        elif context.scene.vloutputs_props.vloutputs_pathtochange == "Subpath": 
-            context.scene.vloutputs_props.vloutputs_subpath_previs += f"**{self.character}"
+        if context.scene.vloutputs_props.path_to_change == "Base Path": 
+            context.scene.vloutputs_props.basepath_previs += f"**{self.character}"
+        elif context.scene.vloutputs_props.path_to_change == "Subpath": 
+            context.scene.vloutputs_props.subpath_previs += f"**{self.character}"
       
         return {"FINISHED"}
 
