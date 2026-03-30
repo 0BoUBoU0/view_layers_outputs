@@ -25,7 +25,7 @@ bl_info = {
     "warning": "",
     "category": "View Layers",
     "blender": (3,6,0),
-    "version": (1,4,3)
+    "version": (1,4,31)
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -90,7 +90,7 @@ class VLOUTPUT_properties (bpy.types.PropertyGroup):
     outputs_prefix : bpy.props.StringProperty(name="Pass Prefix",default="",description="")
     layer_folder : bpy.props.BoolProperty (default=True,name="One folder per layer",description="if checked, images sequences of each layer will be stored in a different folder")
     outputs_folder : bpy.props.BoolProperty (default=False,name="One folder per output",description="if checked, images sequences of each passes will be stored in folders")    
-    corresponding : bpy.props.StringProperty(name="Translation",default="Image=rgba",description='translate field a to field b, separated by ",". I.E. "Image=rgba,Alpha=alpha"')
+    output_corresponding : bpy.props.StringProperty(name="Translation",default="Image=rgba",description='translate field a to field b, separated by ",". I.E. "Image=rgba,Alpha=alpha"')
     clear_unusedSockets : bpy.props.BoolProperty (default=False,name="Clear Unused Output",description="if checked, clear user unused outputs")
     use_layerName_in_pass : bpy.props.BoolProperty (default=False,name="Use Layer Name",description="if checked, the view layer name will be added in each pass name")
     change_only_node_output : bpy.props.BoolProperty (default=False,name="Change Only Node Path",description="if checked, will only change in the node output path, without touching the base path")
@@ -290,7 +290,7 @@ class VLOUTPUT_PT_filesoutputfieldsoptions(bpy.types.Panel):
         row = box.row()
 
         col2 = row.column()
-        col2.prop(vloutputs_props, "output_custom_filepath",icon="FILE_FOLDER")
+        # col2.prop(vloutputs_props, "output_custom_filepath",icon="FILE_FOLDER")
         row = col2.row()
         row.prop(vloutputs_props, "output_corresponding")
 
@@ -506,7 +506,7 @@ def nodes_paths(layername,outputname,outputpath,del_signs):
     scene = bpy.context.scene
     vloutput_path = outputpath
     del_x_signs = bpy.context.scene.vloutputs_props.del_x_signs
-    corresponding = bpy.context.scene.vloutputs_props.corresponding
+    output_corresponding = bpy.context.scene.vloutputs_props.output_corresponding
     output_split = vloutput_path.split("**")
     #print(f"{output_split=}")
     vloutput_filepath = ""
@@ -551,17 +551,17 @@ def nodes_paths(layername,outputname,outputpath,del_signs):
 
         clean_filepath = vloutput_filepath.replace("\\\\", "\\").replace("\\//", "\\").replace("////", "//") # clean to avoid dirty things 
         # change names regarding the translation dic (Image=rgba, etc)
-        outputs_corresponding_list = corresponding.split(',')
-        outputs_corresponding_dict = {}
-        for corres in outputs_corresponding_list:
+        outputs_output_corresponding_list = output_corresponding.split(',')
+        outputs_output_corresponding_dict = {}
+        for corres in outputs_output_corresponding_list:
             corres = corres.replace(" ","")
             corres_split = corres.split("=")
-            outputs_corresponding_dict[corres_split[0]] = corres_split[-1]
-            #print(f"{outputs_corresponding_dict=}")
+            outputs_output_corresponding_dict[corres_split[0]] = corres_split[-1]
+            #print(f"{outputs_output_corresponding_dict=}")
         # check if user wants to change the string
-        for string in outputs_corresponding_dict.keys():
+        for string in outputs_output_corresponding_dict.keys():
             if string in clean_filepath :
-                clean_filepath = clean_filepath.replace(string,outputs_corresponding_dict.get(string))
+                clean_filepath = clean_filepath.replace(string,outputs_output_corresponding_dict.get(string))
     if del_signs:
         complete_filepath = clean_filepath[del_x_signs:]
     else:
@@ -575,7 +575,7 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
     selected_scene_layer_list = selected_scene_layer_list
     output_enabled_dict = output_enabled_dict
     compo_tree = bpy.data.scenes[selected_scene.name].node_tree
-    corresponding = bpy.context.scene.vloutputs_props.corresponding
+    output_corresponding = bpy.context.scene.vloutputs_props.output_corresponding
     clear_unusedSockets = bpy.context.scene.vloutputs_props.clear_unusedSockets
     outputs_reset_selection = bpy.context.scene.vloutputs_props.outputs_reset_selection
     fileformat_checkbox = bpy.context.scene.vloutputs_props.fileformat_checkbox
@@ -587,13 +587,13 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
     bpy.data.scenes[selected_scene.name].use_nodes = True
 
     # change names regarding the translation dic (Image=rgba, etc)
-    outputs_corresponding_list = corresponding.split(',')
-    outputs_corresponding_dict = {}
-    for corres in outputs_corresponding_list:
+    outputs_output_corresponding_list = output_corresponding.split(',')
+    outputs_output_corresponding_dict = {}
+    for corres in outputs_output_corresponding_list:
         corres = corres.replace(" ","")
         corres_split = corres.split("=")
-        outputs_corresponding_dict[corres_split[0]] = corres_split[-1]
-        #print(f"{outputs_corresponding_dict=}")
+        outputs_output_corresponding_dict[corres_split[0]] = corres_split[-1]
+        #print(f"{outputs_output_corresponding_dict=}")
 
     # remove main output namefile to keep only filepath : 
     main_file_output = get_base_path(selected_scene)
@@ -670,16 +670,16 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                 for output in output_enabled_list:
                     output_slot = output
                     # # check if user wants to change the name
-                    # if output in outputs_corresponding_dict.keys():
-                    #     output = outputs_corresponding_dict[output]
+                    # if output in outputs_output_corresponding_dict.keys():
+                    #     output = outputs_output_corresponding_dict[output]
                     # create the outputs paths regarding user fields
                     vloutput_path = nodes_paths(layer.name,output,bpy.context.scene.vloutputs_props.subpath_previs,True)
                     #print(f"{vloutput_path=}")
 
                     # check if user wants to change the string
-                    # for string in outputs_corresponding_dict.keys():
+                    # for string in outputs_output_corresponding_dict.keys():
                     #     if string in vloutput_path :
-                    #         vloutput_path = vloutput_path.replace(string,outputs_corresponding_dict.get(string))
+                    #         vloutput_path = vloutput_path.replace(string,outputs_output_corresponding_dict.get(string))
                     #vloutput_path = vloutput_path[del_x_signs:]
                     input_slot = vloutput_path
                     #print(f"{input_slot=}")
@@ -694,14 +694,14 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                 iter = 0
                 for input_slot in output_enabled_list:
                     # check if user wants to change the name
-                    # if input_slot in outputs_corresponding_dict.keys():
-                    #     input_slot = outputs_corresponding_dict[input_slot]
+                    # if input_slot in outputs_output_corresponding_dict.keys():
+                    #     input_slot = outputs_output_corresponding_dict[input_slot]
                     # create the outputs paths regarding user fields
                     vloutput_path = nodes_paths(layer.name,input_slot,bpy.context.scene.vloutputs_props.subpath_previs,True)
                     # check if user wants to change the string
-                    # for string in outputs_corresponding_dict.keys():
+                    # for string in outputs_output_corresponding_dict.keys():
                     #     if string in vloutput_path :
-                    #         vloutput_path = vloutput_path.replace(string,outputs_corresponding_dict.get(string))
+                    #         vloutput_path = vloutput_path.replace(string,outputs_output_corresponding_dict.get(string))
                     #vloutput_path = vloutput_path[del_x_signs:]
                     # change the name
                     if bpy.context.scene.vloutputs_props.outputs_alpha_solo == False and input_slot != "Alpha":
@@ -714,9 +714,9 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
             base_path = compo_tree.nodes[output_node_name].base_path
             #print(f"{base_path=}")
             if change_only_node_output == False:
-                for string in outputs_corresponding_dict.keys():
+                for string in outputs_output_corresponding_dict.keys():
                     if string in base_path :
-                        compo_tree.nodes[output_node_name].base_path = base_path.replace(string,outputs_corresponding_dict.get(string))
+                        compo_tree.nodes[output_node_name].base_path = base_path.replace(string,outputs_output_corresponding_dict.get(string))
 
 
             # clean unused output
