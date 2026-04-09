@@ -18,14 +18,14 @@
 
 bl_info = {
     "name": "View Layers Outputs",
-    "author": "Yannick 'BoUBoU' Castaing",
+    "author": "Yannick -BoUBoU- Castaing",
     "description": "add some tool to handle view layers for rendering",
     "location": "PROPERTIES > OUTPUT",
     "doc_url": "",
     "warning": "",
     "category": "View Layers",
     "blender": (3,6,0),
-    "version": (1,4,31)
+    "version": (1,4,4)
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -34,6 +34,7 @@ Addon_Version = str(bl_info["version"]).replace(",",".").replace("(","").replace
 
 ### import modules ###
 import bpy
+import os
 from random import uniform
 
 ### define global variables ###
@@ -104,7 +105,7 @@ class VLOUTPUT_properties (bpy.types.PropertyGroup):
     #basepath_prop: bpy.props.BoolProperty(default=False, name="", description='')
     basepath_previs: bpy.props.StringProperty(default="", name="", description='')
     #subpath_prop: bpy.props.BoolProperty(default=True, name="", description='')
-    subpath_previs: bpy.props.StringProperty(default="[Layer Name]**\\**[Pass Name]**\\", name="Output previs", description='output path')
+    subpath_previs: bpy.props.StringProperty(default="[Layer Name]**/**[Pass Name]**/", name="Output previs", description='output path')
     customfield_a: bpy.props.StringProperty(default="", name="", description='First user custom field (A)')
     customfield_b: bpy.props.StringProperty(default="", name="", description='Second user custom field (B)')
     customfield_c: bpy.props.StringProperty(default="", name="", description='Third user custom field (C)')
@@ -228,24 +229,26 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         # main options
         row = box.row()
         char_options_A = [
-            ("[File Name]","", "File Name","FILE"),
-            ("[Layer Name]","", "Layer Name","RENDERLAYERS"),
+            ("[File Name]","", "insert File Name","FILE_BLEND"),
+            ("[Scene Name]","", "insert Scene Name","SCENE_DATA"),
+            ("[File Version]","", "insert File Version (need addon called snapshot files)","LINENUMBERS_ON"),
+            ("[User]","","insert user's name","USER"),
+            ("[Camera Name]","", "insert Camera Name","CAMERA_DATA"),
+            ("[Layer Name]","", "insert Layer Name","RENDERLAYERS"),
+            #("[Output Folder]","", "insert Output Folder","FILE_FOLDER"),
+
             ("[Pass Name]","","Pass Name","IMAGE_PLANE"),
-            ("[File Version]","", "File Version","LINENUMBERS_ON"),
-            ("[Scene Name]","", "Scene Name","SCENE_DATA"),
-            ("[Camera Name]","", "Camera Name","CAMERA_DATA"),
-            #("[Frame Number]", "Frame Number","TIME")
         ]
         ui_blocs(char_options_A)
         # separators
         #row = box.row()
         row.label(text="")
         char_options_B = [
-            #("\\", "Backlash \\","NONE"),
-            ("//","/", "Forward Slash /","NONE"),
-            ("_","_", "Underscore _","NONE"),
-            ("-","-", "Dash -","NONE"),
-            (".",".", "Dot .","NONE"),
+            ("/", "/","insert slash", "NONE"),
+            ("_", "_","insert underscore","NONE"),
+            ("-", "-","insert dash","NONE"),
+            (".", ".","insert dot","NONE"),
+            #("\\", "\\","insert backslash", "NONE"),
         ]
         ui_blocs(char_options_B)
 
@@ -273,17 +276,17 @@ class VLOUTPUT_PT_filesoutputfieldsoptions(bpy.types.Panel):
         row = box.row()
         split = row.split(factor=2/5)
         split.operator('vloutputs.add_character_enum', text="Custom A").character = "[Custom A]"
-        split.prop(vloutputs_props, "customfield_a",text="" )
+        split.prop(vloutputs_props, "output_customfield_a",text="" )
         split = row.split(factor=2/5)
         split.operator('vloutputs.add_character_enum', text="Custom B").character = "[Custom B]"
-        split.prop(vloutputs_props, "customfield_b",text="" )
+        split.prop(vloutputs_props, "output_customfield_b",text="" )
         row = box.row()
         split = row.split(factor=2/5)
         split.operator('vloutputs.add_character_enum', text="Custom C").character = "[Custom C]"
-        split.prop(vloutputs_props, "customfield_c",text="" )
+        split.prop(vloutputs_props, "output_customfield_c",text="" )
         split = row.split(factor=2/5)
-        split.label(text="")
-        split.label(text="")
+        split.operator('vloutputs.add_character_enum', text="Custom D").character = "[Custom D]"
+        split.prop(vloutputs_props, "output_customfield_d",text="" )
 
         ### options
         box = layout.box()
@@ -513,29 +516,35 @@ def nodes_paths(layername,outputname,outputpath,del_signs):
     for elem in output_split:
         if elem == "[Base Path]":
             elem = ""
-        elif elem == "[Pass Name]":
-            elem = outputname
-        elif elem == "[Layer Name]":
-            elem = layername
         elif elem == "[File Name]":
-            elem = bpy.data.filepath.split("\\")[-1].split(".")[0]
+            elem = os.path.basename(bpy.data.filepath).split(".")[0]
         elif elem == "[Scene Name]":
             elem = scene.name
         elif elem == "[Camera Name]":
             elem = scene.camera.name if scene.camera else ""
+        elif elem == "[Layer Name]":
+            elem = bpy.context.view_layer.name
+        elif elem == "[User]":
+            elem = os.getlogin()
         elif elem == "[Custom A]":
-            elem = scene.vloutputs_props.customfield_a
+            elem = scene.setoutputpath_props.output_customfield_a
         elif elem == "[Custom B]":
-            elem = scene.vloutputs_props.customfield_b
+            elem = scene.setoutputpath_props.output_customfield_b
         elif elem == "[Custom C]":
-            elem = scene.vloutputs_props.customfield_c
+            elem = scene.setoutputpath_props.output_customfield_c
+        elif elem == "[Custom D]":
+            elem = scene.setoutputpath_props.output_customfield_d
         elif elem == "[File Version]":
-            if 'Snapshots_History' in bpy.data.texts.keys():
+            if hasattr(bpy.context.scene, "snapshotfiles_props"):
+                file_version = getattr(bpy.context.scene.snapshotfiles_props, "file_version")
+            elif 'Snapshots_History' in bpy.data.texts.keys(): # if older version of snapshot file
                 snap_history = bpy.data.texts['Snapshots_History'].lines[0].body
                 file_version = snap_history.replace("--", "").split(":")[-1].strip()
             else:
                 file_version = "v001"
             elem = file_version
+        elif elem == "[Pass Name]":
+            elem = outputname
         # elif elem == "[Frame Number]":
         #     elem = str(scene.frame_current)
 
