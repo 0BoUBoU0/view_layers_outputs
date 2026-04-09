@@ -25,7 +25,7 @@ bl_info = {
     "warning": "",
     "category": "View Layers",
     "blender": (3,6,0),
-    "version": (1,4,41)
+    "version": (1,4,42)
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -202,7 +202,7 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         bprow.label(text="")
 
         ## subpath box
-        blender_version = bpy.app.version_string[:5].replace(".","")
+        blender_version = int(bpy.app.version_string[:5].replace(".",""))
 
         row = subbox.row()
         split = row.split(align=True, factor=0.9)
