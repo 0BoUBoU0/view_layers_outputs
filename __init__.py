@@ -186,8 +186,6 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         bprow.label(text="")
 
         ## subpath box
-        blender_version = int(bpy.app.version_string[:5].replace(".",""))
-
         row = subbox.row()
         split = row.split(align=True, factor=0.9)
         split.label(icon=sub_icon,text=f"Subpath: {outputs_subpathprevis}")
@@ -196,17 +194,17 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         row = subbox.row()
         if vloutputs_props.pathlength>=64:
             str_check = "too long !!"
-            if blender_version>450:
+            if bpy.app.version >= (4, 4, 0):
                 icon = "STRIP_COLOR_01"
             else:
                 icon = "SEQUENCE_COLOR_01"
         else:
             str_check = "ok"
-            if blender_version>450:
+            if bpy.app.version >= (4, 4, 0):
                 icon = "STRIP_COLOR_04"
             else:
                 icon = "SEQUENCE_COLOR_04"
-        row.label(icon=icon,text=f"length : {vloutputs_props.pathlength} on 64 ( {str_check} )")
+        row.label(icon=icon, text=f"length : {vloutputs_props.pathlength} on 64 ( {str_check} )")
 
         ## fields options
         box = layout.box()
