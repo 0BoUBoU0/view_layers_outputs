@@ -1,20 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 bl_info = {
     "name": "View Layers Outputs",
@@ -25,12 +9,12 @@ bl_info = {
     "warning": "",
     "category": "View Layers",
     "blender": (3,6,0),
-    "version": (1,4,42)
+    "version": (1,4,43)
 }
 
 # get addon name and version to use them automaticaly in the addon
 Addon_Name = str(bl_info["name"])
-Addon_Version = str(bl_info["version"]).replace(",",".").replace("(","").replace(")","")
+Addon_Version = '. '.join([str(n) for n in bl_info["version"]])
 
 ### import modules ###
 import bpy
@@ -56,9 +40,9 @@ def get_base_path(scene):
     return main_file_output
 
 
-## define addon preferences
+# region addon preferences
 class VLOUTPUT_Preferences(bpy.types.AddonPreferences):
-    bl_idname = __name__
+    bl_idname = __package__
 
     precomp_checkbox_pref : bpy.props.BoolProperty(name="Precomp Tab", default=False, description = "if checked, show precomp tab")
 
@@ -67,8 +51,8 @@ class VLOUTPUT_Preferences(bpy.types.AddonPreferences):
         row = layout.row()
         row.prop(self, "precomp_checkbox_pref")
 
-### create property ###
-class VLOUTPUT_properties (bpy.types.PropertyGroup):
+# region create properties
+class VLOUTPUT_properties(bpy.types.PropertyGroup):
     selection_options = [("ALL SCENES","ALL SCENES","ALL SCENES",0),
                                 ("CURRENT SCENE","CURRENT SCENE","CURRENT SCENE",1),
                                 ("ALL SCENES WITH CURRENT SETTINGS","ALL SCENES WITH CURRENT SETTINGS","ALL SCENES WITH CURRENT SETTINGS",2)
@@ -139,7 +123,7 @@ class VLOUTPUT_properties (bpy.types.PropertyGroup):
     precomp_postscript : bpy.props.PointerProperty (type=bpy.types.Text, name="Additional Script", description="script to launch after the nodes creation")
     
     
-### create panels ###
+# region create panels
 # create panel UPPER_PT_lower
 # for view 3D
 class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
@@ -388,7 +372,7 @@ class VLOUTPUT_PT_precomptree(bpy.types.Panel):
         split.prop(vloutputs_props, "precomp_postscript")
 
 
-### create functions ###
+# region create functions
 # create function > create files output
 def list_renderlayers(selected_scene,sort_option):
     ## variables
@@ -512,7 +496,8 @@ def create_renderlayers_nodes(selected_scene,selected_scene_layer_list):
     #print(f"{output_enabled_dict}")
     return output_enabled_dict
 
-# function to grab all informations given by the user regarding the name of the layers
+# region info gathering func.
+# grab all informations given by the user regarding the name of the layers
 def nodes_paths(layername,outputname,outputpath,del_signs):
     scene = bpy.context.scene
     vloutput_path = outputpath
@@ -745,7 +730,7 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                 #{outputs_prefix}
 
 
-### create operators ###        
+# region create operators
 class VLOUTPUT_OT_createnodesoutput(bpy.types.Operator):
     bl_idname = "vloutputs.createnodesoutput"
     bl_label = Addon_Name + "create files output"
@@ -825,7 +810,7 @@ class VLOUTPUT_OT_dellastcharacter(bpy.types.Operator):
 
         return {"FINISHED"}
 
-# Generic operator for adding characters
+# region Generic operator for adding characters
 class VLOUTPUT_OT_add_character_enum(bpy.types.Operator):
     bl_idname = 'vloutputs.add_character_enum'
     bl_label = "Add Character"
@@ -1002,7 +987,7 @@ class VLOUTPUT_OT_createprecomp(bpy.types.Operator):
         print(f"\n {separator} {Addon_Name} Finished {separator} \n")
         return {"FINISHED"}
 
-# list all classes
+# region register
 classes = (
     VLOUTPUT_Preferences,
     VLOUTPUT_properties,
@@ -1016,13 +1001,11 @@ classes = (
     VLOUTPUT_OT_createprecomp,
     )
 
-# register classes
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.types.Scene.vloutputs_props = bpy.props.PointerProperty (type = VLOUTPUT_properties)
 
-#unregister classes 
 def unregister():    
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
