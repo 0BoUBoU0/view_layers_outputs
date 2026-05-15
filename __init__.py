@@ -9,7 +9,7 @@ bl_info = {
     "warning": "",
     "category": "View Layers",
     "blender": (3, 6, 0),
-    "version": (1, 4, 43),
+    "version": (1, 4, 44),
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -606,6 +606,10 @@ def create_outputsNodes(selected_scene, selected_scene_layer_list, output_enable
     #         main_file_output.remove(file_name)
     #         main_file_output = separator.join(main_file_output)
     #         main_file_output = f"{main_file_output}{separator}"
+
+    # if scene is on a video format, force use of fileformat_checkbox
+    if selected_scene.render.image_settings.file_format == 'FFMPEG':
+        fileformat_checkbox = True
 
     # check output image type
     if fileformat_checkbox:
