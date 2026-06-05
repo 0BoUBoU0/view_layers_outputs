@@ -9,7 +9,7 @@ bl_info = {
     "warning": "",
     "category": "View Layers",
     "blender": (3, 6, 0),
-    "version": (1, 4, 43),
+    "version": (1, 4, 45),
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -121,8 +121,8 @@ class VLOUTPUT_properties(bpy.types.PropertyGroup):
     precomp_freestyle : bpy.props.BoolProperty (default=True,name="Freestyle Over",description="if freestyle on separate pass, freestyle over")
     precomp_postscript_checkbox : bpy.props.BoolProperty (default=False,name="",description="launch this script after action it")
     precomp_postscript : bpy.props.PointerProperty (type=bpy.types.Text, name="Additional Script", description="script to launch after the nodes creation")
-    
-    
+
+
 # region create panels
 # create panel UPPER_PT_lower
 # for view 3D
@@ -132,8 +132,8 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = 'output'
-    #bl_parent_id = "RENDER_PT_output"
-    
+    # bl_parent_id = "RENDER_PT_output"
+
     def draw_header(self, context):
         layout = self.layout
         layout.label(text="", icon='NODETREE')
@@ -208,37 +208,38 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
 
         ## fields options
         box = layout.box()
+        
         # text blocs
         def ui_blocs(list):
             iter = 0
-            for char,label,descr,icon in list:
-                operator = row.operator('vloutputs.add_character_enum', text=label,icon=icon)
+            for char, label, descr, icon in list:
+                operator = row.operator('vloutputs.add_character_enum', text=label, icon=icon)
                 operator.character = char
                 operator.tooltip = descr
                 iter += 1
+
         # main options
         row = box.row()
         char_options_A = [
-            ("[File Name]","", "insert File Name","FILE_BLEND"),
-            ("[Scene Name]","", "insert Scene Name","SCENE_DATA"),
-            ("[File Version]","", "insert File Version (need addon called snapshot files)","LINENUMBERS_ON"),
-            ("[User]","","insert user's name","USER"),
-            ("[Camera Name]","", "insert Camera Name","CAMERA_DATA"),
-            ("[Layer Name]","", "insert Layer Name","RENDERLAYERS"),
-            #("[Output Folder]","", "insert Output Folder","FILE_FOLDER"),
-
-            ("[Pass Name]","","Pass Name","IMAGE_PLANE"),
+            ("[File Name]", "", "insert File Name", "FILE_BLEND"),
+            ("[Scene Name]", "", "insert Scene Name", "SCENE_DATA"),
+            ("[File Version]", "", "insert File Version (need addon called snapshot files)", "LINENUMBERS_ON"),
+            ("[User]", "", "insert user's name", "USER"),
+            ("[Camera Name]", "", "insert Camera Name", "CAMERA_DATA"),
+            ("[Layer Name]", "", "insert Layer Name", "RENDERLAYERS"),
+            # ("[Output Folder]","", "insert Output Folder","FILE_FOLDER"),
+            ("[Pass Name]", "", "Pass Name", "IMAGE_PLANE"),
         ]
         ui_blocs(char_options_A)
         # separators
-        #row = box.row()
+        # row = box.row()
         row.label(text="")
         char_options_B = [
-            ("/", "/","insert slash", "NONE"),
-            ("_", "_","insert underscore","NONE"),
-            ("-", "-","insert dash","NONE"),
-            (".", ".","insert dot","NONE"),
-            #("\\", "\\","insert backslash", "NONE"),
+            ("/", "/", "insert slash", "NONE"),
+            ("_", "_", "insert underscore", "NONE"),
+            ("-", "-", "insert dash", "NONE"),
+            (".", ".", "insert dot", "NONE"),
+            # ("\\", "\\","insert backslash", "NONE"),
         ]
         ui_blocs(char_options_B)
 
@@ -425,7 +426,7 @@ def list_renderlayers_nodes(selected_scene,sort_option):
     #print(f"{renderLayer_nodes_list}")
     return renderLayer_nodes_list
 
-def create_renderlayers_nodes(selected_scene,selected_scene_layer_list):
+def create_renderlayers_nodes(selected_scene, selected_scene_layer_list):
     ## variables
     selected_scene = selected_scene
     selected_scene_layer_list = selected_scene_layer_list
@@ -496,7 +497,7 @@ def create_renderlayers_nodes(selected_scene,selected_scene_layer_list):
 
 # region info gathering func.
 # grab all informations given by the user regarding the name of the layers
-def nodes_paths(layername,outputname,outputpath,del_signs):
+def nodes_paths(layername, outputname, outputpath, del_signs):
     scene = bpy.context.scene
     vloutput_path = outputpath
     del_x_signs = bpy.context.scene.vloutputs_props.del_x_signs
@@ -514,7 +515,7 @@ def nodes_paths(layername,outputname,outputpath,del_signs):
         elif elem == "[Camera Name]":
             elem = scene.camera.name if scene.camera else ""
         elif elem == "[Layer Name]":
-            elem = bpy.context.view_layer.name
+            elem = layername # bpy.context.view_layer.name
         elif elem == "[User]":
             elem = os.getlogin()
         elif elem == "[Custom A]":
@@ -607,6 +608,10 @@ def create_outputsNodes(selected_scene, selected_scene_layer_list, output_enable
     #         main_file_output = separator.join(main_file_output)
     #         main_file_output = f"{main_file_output}{separator}"
 
+    # if scene is on a video format, force use of fileformat_checkbox
+    if selected_scene.render.image_settings.file_format == 'FFMPEG':
+        fileformat_checkbox = True
+
     # check output image type
     if fileformat_checkbox:
         file_format = fileformat
@@ -673,7 +678,7 @@ def create_outputsNodes(selected_scene, selected_scene_layer_list, output_enable
                     # if output in outputs_output_corresponding_dict.keys():
                     #     output = outputs_output_corresponding_dict[output]
                     # create the outputs paths regarding user fields
-                    vloutput_path = nodes_paths(layer.name,output,bpy.context.scene.vloutputs_props.subpath_previs,True)
+                    vloutput_path = nodes_paths(layer.name, output, bpy.context.scene.vloutputs_props.subpath_previs, True)
                     #print(f"{vloutput_path=}")
 
                     # check if user wants to change the string
@@ -766,11 +771,11 @@ class VLOUTPUT_OT_createnodesoutput(bpy.types.Operator):
                 if scene.vloutputs_props.outputs_reset_selection == "RESET ALL TREE":
                     scene.node_tree.nodes.clear()
                 # list all render layers
-                selected_scene_layer_list = list_renderlayers(work_scene,sort_option)
+                selected_scene_layer_list = list_renderlayers(work_scene, sort_option)
                 # create render layers
-                output_enabled_dict = create_renderlayers_nodes(work_scene,selected_scene_layer_list)
+                output_enabled_dict = create_renderlayers_nodes(work_scene, selected_scene_layer_list)
                 # create output nodes
-                create_outputsNodes(work_scene,selected_scene_layer_list,output_enabled_dict)
+                create_outputsNodes(work_scene, selected_scene_layer_list, output_enabled_dict)
                 bpy.context.window.scene = work_scene # switch back to user scene work
                 #print(" --- scene finished --- ")
 
@@ -791,8 +796,6 @@ class VLOUTPUT_OT_dellastcharacter(bpy.types.Operator):
         # if subpath_previs != "":
         #     output_split = subpath_previs.split("**")
         #     context.scene.vloutputs_props.subpath_previs = "**".join(output_split[:-1])
-
-
 
         vloutputs_props = context.scene.vloutputs_props
 
