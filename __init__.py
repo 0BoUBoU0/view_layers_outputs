@@ -25,7 +25,7 @@ bl_info = {
     "warning": "",
     "category": "View Layers",
     "blender": (3,6,0),
-    "version": (1,5,3)
+    "version": (1,5,32)
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -392,7 +392,8 @@ class VLOUTPUT_PT_precomptree(bpy.types.Panel):
 # check blender version
 def blender_5():
     blender_version = int(bpy.app.version_string[:5].replace(".",""))
-    if blender_version > 450:
+    #print(f"blender_version : {blender_version}")
+    if blender_version > 460:
         return True
     else:
         return False
@@ -621,7 +622,7 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
     change_only_node_output = bpy.context.scene.vloutputs_props.change_only_node_output
     del_x_signs = bpy.context.scene.vloutputs_props.del_x_signs
 
-    if blender_5:
+    if blender_5():
         new_node_tree_name = f"Node_Tree-{selected_scene.name}"
         if new_node_tree_name not in bpy.data.node_groups.keys():
             bpy.ops.node.new_compositing_node_group(name = new_node_tree_name)
@@ -656,7 +657,8 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
         media_type = "IMAGE"
     else:
         file_format = selected_scene.render.image_settings.file_format
-        media_type = selected_scene.render.image_settings.media_type
+        if hasattr(selected_scene.render.image_settings, "media_type"):
+            media_type = selected_scene.render.image_settings.media_type
 
     ## create outputs nodes
     iter_node = 0
@@ -689,7 +691,9 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                 compo_tree.nodes[output_node_name].use_custom_color = True
                 compo_tree.nodes[output_node_name].color = compo_tree.nodes[render_node_name].color # give the same color as render layer node
                 compo_tree.nodes[output_node_name].mute = compo_tree.nodes[render_node_name].mute # check if mute
-                compo_tree.nodes[output_node_name].format.media_type = media_type
+                if blender_5():
+                    print("blender 5")
+                    compo_tree.nodes[output_node_name].format.media_type = media_type # only in blender >= 5
                 compo_tree.nodes[output_node_name].format.file_format = file_format
                 if fileformat_checkbox:
                     if outputs_alpha_solo:
@@ -703,11 +707,18 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
             else:
                 new_output = False
 
+            # blender 5 
+            if hasattr(compo_tree.nodes[output_node_name],"file_name"):
+                file_name = layer_basepath.split("/")[-1]
+                layer_basepath = layer_basepath.replace(file_name,"")
+                compo_tree.nodes[output_node_name].file_name = file_name
+
             #print(f"{new_output=}")
 
             # update output node path (different from output names !)
             if blender_5:
-                compo_tree.nodes[output_node_name].directory = f"{layer_basepath}"
+                if hasattr(compo_tree.nodes[output_node_name], "directory"):
+                    compo_tree.nodes[output_node_name].directory = f"{layer_basepath}"
             else:
                 compo_tree.nodes[output_node_name].base_path = f"{layer_basepath}"
 
@@ -716,7 +727,8 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
             ## create inputs in file outputs node regarding view layer
             if new_output or outputs_reset_selection == "ONLY UPDATE LINKS":
                 if blender_5:
-                    compo_tree.nodes[output_node_name].file_output_items.clear()
+                    if hasattr(compo_tree.nodes[output_node_name], "file_output_items"):
+                        compo_tree.nodes[output_node_name].file_output_items.clear()
                 else:
                     compo_tree.nodes[output_node_name].inputs.clear()
 
@@ -726,17 +738,14 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                     input_slot = vloutput_path
 
                     if blender_5:
-                        compo_tree.nodes[output_node_name].file_output_items.new("RGBA", input_slot)
+                        if hasattr(compo_tree.nodes[output_node_name], "file_output_items"):
+                            compo_tree.nodes[output_node_name].file_output_items.new("RGBA", input_slot)
                     else:
                         compo_tree.nodes[output_node_name].layer_slots.new(input_slot)
 
                     if bpy.context.scene.vloutputs_props.pathlength <= 64:
-                        if bpy.context.scene.vloutputs_props.outputs_alpha_solo == True or \
-                        bpy.context.scene.vloutputs_props.outputs_alpha_solo == False and output != "Alpha":
-                            compo_tree.links.new(
-                                compo_tree.nodes[render_node_name].outputs[output_slot],
-                                compo_tree.nodes[output_node_name].inputs[input_slot]
-                            )
+                        if bpy.context.scene.vloutputs_props.outputs_alpha_solo == True or bpy.context.scene.vloutputs_props.outputs_alpha_solo == False and output != "Alpha":
+                            compo_tree.links.new(compo_tree.nodes[render_node_name].outputs[output_slot],compo_tree.nodes[output_node_name].inputs[input_slot])
             
             # update outputs slots names
             if outputs_reset_selection=="ONLY UPDATE PATHS":
