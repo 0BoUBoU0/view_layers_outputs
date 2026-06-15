@@ -8,8 +8,13 @@ bl_info = {
     "doc_url": "",
     "warning": "",
     "category": "View Layers",
+<<<<<<< HEAD
     "blender": (3, 6, 0),
     "version": (1, 4, 43),
+=======
+    "blender": (3,6,0),
+    "version": (1,5,2)
+>>>>>>> 0d77adc (+ change elements for 5.0 compatibility)
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -186,6 +191,11 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         bprow.label(text="")
 
         ## subpath box
+<<<<<<< HEAD
+=======
+        #blender_version = int(bpy.app.version_string[:5].replace(".",""))
+
+>>>>>>> 0d77adc (+ change elements for 5.0 compatibility)
         row = subbox.row()
         split = row.split(align=True, factor=0.9)
         split.label(icon=sub_icon,text=f"Subpath: {outputs_subpathprevis}")
@@ -194,13 +204,21 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         row = subbox.row()
         if vloutputs_props.pathlength>=64:
             str_check = "too long !!"
+<<<<<<< HEAD
             if bpy.app.version >= (4, 4, 0):
+=======
+            if blender_5()>450:
+>>>>>>> 0d77adc (+ change elements for 5.0 compatibility)
                 icon = "STRIP_COLOR_01"
             else:
                 icon = "SEQUENCE_COLOR_01"
         else:
             str_check = "ok"
+<<<<<<< HEAD
             if bpy.app.version >= (4, 4, 0):
+=======
+            if blender_5()>450:
+>>>>>>> 0d77adc (+ change elements for 5.0 compatibility)
                 icon = "STRIP_COLOR_04"
             else:
                 icon = "SEQUENCE_COLOR_04"
@@ -370,7 +388,20 @@ class VLOUTPUT_PT_precomptree(bpy.types.Panel):
         split.prop(vloutputs_props, "precomp_postscript")
 
 
+<<<<<<< HEAD
 # region create functions
+=======
+### create functions ###
+# check blender version
+def blender_5():
+    blender_version = int(bpy.app.version_string[:5].replace(".",""))
+    if blender_version > 450:
+        return True
+    else:
+        return False
+
+
+>>>>>>> 0d77adc (+ change elements for 5.0 compatibility)
 # create function > create files output
 def list_renderlayers(selected_scene,sort_option):
     ## variables
@@ -398,7 +429,10 @@ def list_renderlayers(selected_scene,sort_option):
 def list_renderlayers_nodes(selected_scene,sort_option):
     ## variables
     selected_scene = selected_scene
-    node_tree = selected_scene.node_tree
+    if blender_5():
+        node_tree = selected_scene.compositing_node_group
+    else:
+        node_tree = selected_scene.node_tree
 
     renderLayer_nodes_list = []
     for node in node_tree.nodes:
@@ -434,7 +468,10 @@ def create_renderlayers_nodes(selected_scene,selected_scene_layer_list):
     output_enabled_dict = {}
     
     bpy.data.scenes[selected_scene.name].use_nodes = True
-    compo_tree = bpy.data.scenes[selected_scene.name].node_tree
+    if blender_5():
+        compo_tree = bpy.data.scenes[selected_scene.name].compositing_node_group
+    else:
+        compo_tree = bpy.data.scenes[selected_scene.name].node_tree
 
     ## create render layers
     iter_node = 0
@@ -574,7 +611,10 @@ def create_outputsNodes(selected_scene, selected_scene_layer_list, output_enable
     selected_scene = selected_scene
     selected_scene_layer_list = selected_scene_layer_list
     output_enabled_dict = output_enabled_dict
-    compo_tree = bpy.data.scenes[selected_scene.name].node_tree
+    if blender_5():
+        compo_tree = bpy.data.scenes[selected_scene.name].compositing_node_group
+    else:
+        compo_tree = bpy.data.scenes[selected_scene.name].node_tree
     output_corresponding = bpy.context.scene.vloutputs_props.output_corresponding
     clear_unusedSockets = bpy.context.scene.vloutputs_props.clear_unusedSockets
     outputs_reset_selection = bpy.context.scene.vloutputs_props.outputs_reset_selection
@@ -610,8 +650,10 @@ def create_outputsNodes(selected_scene, selected_scene_layer_list, output_enable
     # check output image type
     if fileformat_checkbox:
         file_format = fileformat
+        media_type = "IMAGE"
     else:
         file_format = selected_scene.render.image_settings.file_format
+        media_type = selected_scene.render.image_settings.media_type
 
     ## create outputs nodes
     iter_node = 0
@@ -644,6 +686,7 @@ def create_outputsNodes(selected_scene, selected_scene_layer_list, output_enable
                 compo_tree.nodes[output_node_name].use_custom_color = True
                 compo_tree.nodes[output_node_name].color = compo_tree.nodes[render_node_name].color # give the same color as render layer node
                 compo_tree.nodes[output_node_name].mute = compo_tree.nodes[render_node_name].mute # check if mute
+                compo_tree.nodes[output_node_name].format.file_format = media_type
                 compo_tree.nodes[output_node_name].format.file_format = file_format
                 if fileformat_checkbox:
                     if outputs_alpha_solo:
@@ -764,7 +807,11 @@ class VLOUTPUT_OT_createnodesoutput(bpy.types.Operator):
             scene.use_nodes = True
             if precomp_scene_suffixe not in bpy.context.scene.name:
                 if scene.vloutputs_props.outputs_reset_selection == "RESET ALL TREE":
-                    scene.node_tree.nodes.clear()
+                    if blender_5():
+                        scene.compositing_node_group.nodes.clear()
+                    else:
+                        scene.node_tree.nodes.clear()
+                    
                 # list all render layers
                 selected_scene_layer_list = list_renderlayers(work_scene,sort_option)
                 # create render layers
@@ -864,7 +911,10 @@ class VLOUTPUT_OT_createprecomp(bpy.types.Operator):
         for scene in scenes_list:
             scene_name = scene.name
             bpy.data.scenes[scene_name].use_nodes = True
-            node_tree = bpy.data.scenes[scene_name].node_tree
+            if blender_5():
+                node_tree = selected_scene.compositing_node_group
+            else:
+                node_tree = selected_scene.node_tree
             # if len(node_tree.nodes)==2 : # in case of it's a new node tree, renderlayer + composite node are in
             #     node_tree.nodes.clear()
             # if bpy.context.scene.vloutputs_props.outputs_reset_selection == "RESET ALL TREE":
