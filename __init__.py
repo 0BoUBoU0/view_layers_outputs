@@ -9,7 +9,7 @@ bl_info = {
     "warning": "",
     "category": "View Layers",
     "blender": (5, 0, 0),
-    "version": (2, 0, 1),
+    "version": (2, 1, 0),
 }
 
 # get addon name and version to use them automaticaly in the addon
@@ -19,6 +19,7 @@ ADDON_VERSION = '. '.join([str(n) for n in bl_info["version"]])
 ### import modules ###
 import bpy
 import os
+import json
 from random import uniform
 
 ### define global variables ###
@@ -169,6 +170,9 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         ## box for each path
         row = pathbox.row()
         row.prop(vloutputs_props,"path_to_change",expand=True)
+        subrow = row.row(align=True)
+        subrow.operator('vloutputs.copy_path_templates', text="", icon="COPYDOWN")
+        subrow.operator('vloutputs.paste_path_templates', text="", icon="PASTEDOWN")
         row = pathbox.row()
         colA = row.column()
         bpbox = colA.box()
@@ -836,7 +840,93 @@ class VLOUTPUT_OT_add_character_enum(bpy.types.Operator):
             context.scene.vloutputs_props.basepath_previs += f"**{self.character}"
         elif context.scene.vloutputs_props.path_to_change == "Subpath": 
             context.scene.vloutputs_props.subpath_previs += f"**{self.character}"
-      
+
+        return {"FINISHED"}
+
+# region copy / paste path templates
+TEMPLATE_CLIPBOARD_KEY = "vloutputs_path_templates"
+
+def template_display(template):
+    # same readable form as in the panel
+    return template.replace("**", "") if template else "(empty)"
+
+class VLOUTPUT_OT_copy_path_templates(bpy.types.Operator):
+    bl_idname = 'vloutputs.copy_path_templates'
+    bl_label = "Copy Path Templates"
+    bl_description = "Copy base path and subpath templates to the clipboard, to paste them in another shot"
+
+    def execute(self, context):
+        vloutputs_props = context.scene.vloutputs_props
+        data = {
+            TEMPLATE_CLIPBOARD_KEY: {
+                "basepath": vloutputs_props.basepath_previs,
+                "subpath": vloutputs_props.subpath_previs,
+            }
+        }
+        context.window_manager.clipboard = json.dumps(data)
+        self.report({'INFO'}, "Base path and subpath templates copied")
+        return {"FINISHED"}
+
+class VLOUTPUT_OT_paste_path_templates(bpy.types.Operator):
+    bl_idname = 'vloutputs.paste_path_templates'
+    bl_label = "Paste Path Templates"
+    bl_description = "Paste base path and/or subpath templates from the clipboard"
+    bl_options = {"REGISTER", "UNDO"}
+
+    use_basepath: bpy.props.BoolProperty(name="Base Path", default=True, options={'SKIP_SAVE'})
+    use_subpath: bpy.props.BoolProperty(name="Subpath", default=True, options={'SKIP_SAVE'})
+    new_basepath: bpy.props.StringProperty(options={'SKIP_SAVE', 'HIDDEN'})
+    new_subpath: bpy.props.StringProperty(options={'SKIP_SAVE', 'HIDDEN'})
+
+    def invoke(self, context, event):
+        try:
+            data = json.loads(context.window_manager.clipboard)[TEMPLATE_CLIPBOARD_KEY]
+            self.new_basepath = data["basepath"]
+            self.new_subpath = data["subpath"]
+        except (ValueError, TypeError, KeyError):
+            self.report({'WARNING'}, "No path templates in clipboard (use copy button first)")
+            return {"CANCELLED"}
+
+        # pre-check only what would actually change
+        vloutputs_props = context.scene.vloutputs_props
+        self.use_basepath = self.new_basepath != vloutputs_props.basepath_previs
+        self.use_subpath = self.new_subpath != vloutputs_props.subpath_previs
+        return context.window_manager.invoke_props_dialog(self, width=600, confirm_text="Paste")
+
+    def draw_template(self, layout, prop_name, current, new):
+        box = layout.box()
+        row = box.row()
+        row.prop(self, prop_name)
+        if current == new:
+            row.label(text="identical", icon='CHECKMARK')
+        col = box.column()
+        col.active = getattr(self, prop_name)
+        split = col.split(factor=.12)
+        split.label(text="Current:")
+        split.label(text=template_display(current))
+        split = col.split(factor=.12)
+        split.label(text="New:")
+        split.label(text=template_display(new))
+
+    def draw(self, context):
+        vloutputs_props = context.scene.vloutputs_props
+        layout = self.layout
+        self.draw_template(layout, "use_basepath", vloutputs_props.basepath_previs, self.new_basepath)
+        self.draw_template(layout, "use_subpath", vloutputs_props.subpath_previs, self.new_subpath)
+
+    def execute(self, context):
+        vloutputs_props = context.scene.vloutputs_props
+        replaced = []
+        if self.use_basepath:
+            vloutputs_props.basepath_previs = self.new_basepath
+            replaced.append("base path")
+        if self.use_subpath:
+            vloutputs_props.subpath_previs = self.new_subpath
+            replaced.append("subpath")
+        if not replaced:
+            self.report({'INFO'}, "Nothing pasted")
+            return {"CANCELLED"}
+        self.report({'INFO'}, f"Pasted {' and '.join(replaced)} template")
         return {"FINISHED"}
 
 class VLOUTPUT_OT_createprecomp(bpy.types.Operator):
@@ -1006,6 +1096,8 @@ classes = (
     VLOUTPUT_OT_createnodesoutput,
     VLOUTPUT_OT_dellastcharacter,
     VLOUTPUT_OT_add_character_enum,
+    VLOUTPUT_OT_copy_path_templates,
+    VLOUTPUT_OT_paste_path_templates,
     VLOUTPUT_OT_createprecomp,
     )
 
