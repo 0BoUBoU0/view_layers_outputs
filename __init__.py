@@ -1,20 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 bl_info = {
     "name": "View Layers Outputs",
@@ -24,23 +8,26 @@ bl_info = {
     "doc_url": "",
     "warning": "",
     "category": "View Layers",
-    "blender": (3,6,0),
-    "version": (1,5,32)
+    "blender": (5, 0, 0),
+    "version": (2, 1, 1),
 }
 
 # get addon name and version to use them automaticaly in the addon
-Addon_Name = str(bl_info["name"])
-Addon_Version = str(bl_info["version"]).replace(",",".").replace("(","").replace(")","")
+ADDON_NAME = str(bl_info["name"])
+ADDON_VERSION = '. '.join([str(n) for n in bl_info["version"]])
 
 ### import modules ###
 import bpy
 import os
+import json
 from random import uniform
 
 ### define global variables ###
-debug_mode = False
-separator = "-" * 20
-precomp_scene_suffixe = "_Pre-Compositing"
+STRIP_NAME = 'STRIP'
+SEPARATOR = "-" * 20
+PRECOMP_SCENE_SUFFIXE = "_Pre-Compositing"
+# keep a margin under the ~260 characters windows MAX_PATH limit (frame number + extension are appended)
+MAX_PATH_LENGTH = 250
 
 def get_base_path(scene):
     # remove main output namefile to keep only filepath : 
@@ -55,10 +42,18 @@ def get_base_path(scene):
             main_file_output = f"{main_file_output}{separator}"
     return main_file_output
 
+def get_compositing_tree(scene):
+    # since Blender 5.0 the compositor tree is a node group datablock, create one if the scene has none
+    tree = scene.compositing_node_group
+    if tree is None:
+        tree = bpy.data.node_groups.new(f"{scene.name}_compositing", 'CompositorNodeTree')
+        scene.compositing_node_group = tree
+    return tree
 
-## define addon preferences
+
+# region addon preferences
 class VLOUTPUT_Preferences(bpy.types.AddonPreferences):
-    bl_idname = __name__
+    bl_idname = __package__
 
     precomp_checkbox_pref : bpy.props.BoolProperty(name="Precomp Tab", default=False, description = "if checked, show precomp tab")
 
@@ -67,8 +62,8 @@ class VLOUTPUT_Preferences(bpy.types.AddonPreferences):
         row = layout.row()
         row.prop(self, "precomp_checkbox_pref")
 
-### create property ###
-class VLOUTPUT_properties (bpy.types.PropertyGroup):
+# region create properties
+class VLOUTPUT_properties(bpy.types.PropertyGroup):
     selection_options = [("ALL SCENES","ALL SCENES","ALL SCENES",0),
                                 ("CURRENT SCENE","CURRENT SCENE","CURRENT SCENE",1),
                                 ("ALL SCENES WITH CURRENT SETTINGS","ALL SCENES WITH CURRENT SETTINGS","ALL SCENES WITH CURRENT SETTINGS",2)
@@ -98,7 +93,7 @@ class VLOUTPUT_properties (bpy.types.PropertyGroup):
     del_x_signs : bpy.props.IntProperty (default=0,name="Delete X First Signs",description="")
 
     path_to_change_options = [("Base Path","Base Path","base path from the main output",0),
-                            ("Subpath","Subpath","filename or subpath for all outputs of a node output",1)
+                            ("Subpath","Subpath","subpath for all outputs of a node output",1)
                             ]
     path_to_change : bpy.props.EnumProperty (items = path_to_change_options,name = "Path to Change",description = "choose selection type",default=1)
     
@@ -137,19 +132,19 @@ class VLOUTPUT_properties (bpy.types.PropertyGroup):
     precomp_freestyle : bpy.props.BoolProperty (default=True,name="Freestyle Over",description="if freestyle on separate pass, freestyle over")
     precomp_postscript_checkbox : bpy.props.BoolProperty (default=False,name="",description="launch this script after action it")
     precomp_postscript : bpy.props.PointerProperty (type=bpy.types.Text, name="Additional Script", description="script to launch after the nodes creation")
-    
-    
-### create panels ###
+
+
+# region create panels
 # create panel UPPER_PT_lower
 # for view 3D
 class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
-    bl_label = f"View Layers Outputs - {Addon_Version}"
+    bl_label = f"View Layers Outputs - {ADDON_VERSION}"
     bl_idname = "VLOUTPUT_PT_filesoutput"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = 'output'
-    #bl_parent_id = "RENDER_PT_output"
-    
+    # bl_parent_id = "RENDER_PT_output"
+
     def draw_header(self, context):
         layout = self.layout
         layout.label(text="", icon='NODETREE')
@@ -160,13 +155,13 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         ## update box
         uptbox = layout.box()
         split = uptbox.split(factor=.85, align = True)
-        if vloutputs_props.pathlength>=64:
-            text = "Cannot update (subpath too long)"
-            icon = "STRIP_COLOR_01"
+        if vloutputs_props.pathlength >= MAX_PATH_LENGTH:
+            text = "Update Layers outputs (last path was too long !)"
+            icon = f"{STRIP_NAME}_COLOR_01"
         else:
             text = "Update Layers outputs"
             icon = "OUTPUT"
-        split.operator("vloutputs.createnodesoutput",text=text,emboss=True,depress=False,icon=icon)
+        split.operator("vloutputs.createnodesoutput", text=text, emboss=True, depress=False, icon=icon)
         split.prop(vloutputs_props, "outputs_reset_selection")
         ## path selection
         outputs_basepathprevis = vloutputs_props.basepath_previs.replace("**", "")
@@ -175,6 +170,9 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         ## box for each path
         row = pathbox.row()
         row.prop(vloutputs_props,"path_to_change",expand=True)
+        subrow = row.row(align=True)
+        subrow.operator('vloutputs.copy_path_templates', text="", icon="COPYDOWN")
+        subrow.operator('vloutputs.paste_path_templates', text="", icon="PASTEDOWN")
         row = pathbox.row()
         colA = row.column()
         bpbox = colA.box()
@@ -202,61 +200,54 @@ class VLOUTPUT_PT_filesoutput(bpy.types.Panel):
         bprow.label(text="")
 
         ## subpath box
-        #blender_version = int(bpy.app.version_string[:5].replace(".",""))
-
         row = subbox.row()
         split = row.split(align=True, factor=0.9)
         split.label(icon=sub_icon,text=f"Subpath: {outputs_subpathprevis}")
         if vloutputs_props.path_to_change == "Subpath": 
             split.operator('vloutputs.dellastcharacter', text="", icon="TRIA_LEFT_BAR")
         row = subbox.row()
-        if vloutputs_props.pathlength>=64:
-            str_check = "too long !!"
-            if blender_5:
-                icon = "STRIP_COLOR_01"
-            else:
-                icon = "SEQUENCE_COLOR_01"
+        if vloutputs_props.pathlength >= MAX_PATH_LENGTH:
+            str_check = "too long for windows !!"
+            icon = f"{STRIP_NAME}_COLOR_01"
         else:
             str_check = "ok"
-            if blender_5:
-                icon = "STRIP_COLOR_04"
-            else:
-                icon = "SEQUENCE_COLOR_04"
-        row.label(icon=icon,text=f"length : {vloutputs_props.pathlength} on 64 ( {str_check} )")
+            icon = f"{STRIP_NAME}_COLOR_04"
+        row.label(icon=icon, text=f"last complete path length : {vloutputs_props.pathlength} on {MAX_PATH_LENGTH} ( {str_check} )")
 
         ## fields options
         box = layout.box()
+        
         # text blocs
         def ui_blocs(list):
             iter = 0
-            for char,label,descr,icon in list:
-                operator = row.operator('vloutputs.add_character_enum', text=label,icon=icon)
+            for char, label, descr, icon in list:
+                operator = row.operator('vloutputs.add_character_enum', text=label, icon=icon)
                 operator.character = char
                 operator.tooltip = descr
                 iter += 1
+
         # main options
         row = box.row()
         char_options_A = [
-            ("[File Name]","", "insert File Name","FILE_BLEND"),
-            ("[Scene Name]","", "insert Scene Name","SCENE_DATA"),
-            ("[File Version]","", "insert File Version (need addon called snapshot files)","LINENUMBERS_ON"),
-            ("[User]","","insert user's name","USER"),
-            ("[Camera Name]","", "insert Camera Name","CAMERA_DATA"),
-            ("[Layer Name]","", "insert Layer Name","RENDERLAYERS"),
-            #("[Output Folder]","", "insert Output Folder","FILE_FOLDER"),
-
-            ("[Pass Name]","","Pass Name","IMAGE_PLANE"),
+            ("[File Name]", "", "insert File Name", "FILE_BLEND"),
+            ("[Scene Name]", "", "insert Scene Name", "SCENE_DATA"),
+            ("[File Version]", "", "insert File Version (need addon called snapshot files)", "LINENUMBERS_ON"),
+            ("[User]", "", "insert user's name", "USER"),
+            ("[Camera Name]", "", "insert Camera Name", "CAMERA_DATA"),
+            ("[Layer Name]", "", "insert Layer Name", "RENDERLAYERS"),
+            # ("[Output Folder]","", "insert Output Folder","FILE_FOLDER"),
+            ("[Pass Name]", "", "Pass Name", "IMAGE_PLANE"),
         ]
         ui_blocs(char_options_A)
         # separators
-        #row = box.row()
+        # row = box.row()
         row.label(text="")
         char_options_B = [
-            ("/", "/","insert slash", "NONE"),
-            ("_", "_","insert underscore","NONE"),
-            ("-", "-","insert dash","NONE"),
-            (".", ".","insert dot","NONE"),
-            #("\\", "\\","insert backslash", "NONE"),
+            ("/", "/", "insert slash", "NONE"),
+            ("_", "_", "insert underscore", "NONE"),
+            ("-", "-", "insert dash", "NONE"),
+            (".", ".", "insert dot", "NONE"),
+            # ("\\", "\\","insert backslash", "NONE"),
         ]
         ui_blocs(char_options_B)
 
@@ -276,7 +267,7 @@ class VLOUTPUT_PT_filesoutputfieldsoptions(bpy.types.Panel):
     def draw(self, context):
         vloutputs_props = context.scene.vloutputs_props
         layout = self.layout
-        
+
         ### custom fields
         box = layout.box()
         row = box.row()
@@ -350,7 +341,7 @@ class VLOUTPUT_PT_precomptree(bpy.types.Panel):
     bl_region_type = "WINDOW"
     bl_context = 'output'
     bl_parent_id = "VLOUTPUT_PT_filesoutput"
-    
+
     # # show the tab regarding preferences
     # @classmethod
     # def poll(cls, context):
@@ -388,17 +379,7 @@ class VLOUTPUT_PT_precomptree(bpy.types.Panel):
         split.prop(vloutputs_props, "precomp_postscript")
 
 
-### create functions ###
-# check blender version
-def blender_5():
-    blender_version = int(bpy.app.version_string[:5].replace(".",""))
-    #print(f"blender_version : {blender_version}")
-    if blender_version > 460:
-        return True
-    else:
-        return False
-
-
+# region create functions
 # create function > create files output
 def list_renderlayers(selected_scene,sort_option):
     ## variables
@@ -426,12 +407,7 @@ def list_renderlayers(selected_scene,sort_option):
 def list_renderlayers_nodes(selected_scene,sort_option):
     ## variables
     selected_scene = selected_scene
-    if blender_5():
-        new_node_tree_name = f"Node_Tree-{selected_scene.name}"
-        #node_tree = selected_scene.compositing_node_group
-        node_tree = bpy.data.node_groups[new_node_tree_name]
-    else:
-        node_tree = selected_scene.node_tree
+    node_tree = get_compositing_tree(selected_scene)
 
     renderLayer_nodes_list = []
     for node in node_tree.nodes:
@@ -458,19 +434,15 @@ def list_renderlayers_nodes(selected_scene,sort_option):
     #print(f"{renderLayer_nodes_list}")
     return renderLayer_nodes_list
 
-def create_renderlayers_nodes(selected_scene,selected_scene_layer_list):
+def create_renderlayers_nodes(selected_scene, selected_scene_layer_list):
     ## variables
     selected_scene = selected_scene
     selected_scene_layer_list = selected_scene_layer_list
     outputs_reset_selection = bpy.context.scene.vloutputs_props.outputs_reset_selection
 
     output_enabled_dict = {}
-    
-    bpy.data.scenes[selected_scene.name].use_nodes = True
-    if blender_5():
-        compo_tree = bpy.data.scenes[selected_scene.name].compositing_node_group
-    else:
-        compo_tree = bpy.data.scenes[selected_scene.name].node_tree
+
+    compo_tree = get_compositing_tree(bpy.data.scenes[selected_scene.name])
 
     ## create render layers
     iter_node = 0
@@ -530,8 +502,9 @@ def create_renderlayers_nodes(selected_scene,selected_scene_layer_list):
     #print(f"{output_enabled_dict}")
     return output_enabled_dict
 
-# function to grab all informations given by the user regarding the name of the layers
-def nodes_paths(layername,outputname,outputpath,del_signs):
+# region info gathering func.
+# grab all informations given by the user regarding the name of the layers
+def nodes_paths(layername, outputname, outputpath, del_signs):
     scene = bpy.context.scene
     vloutput_path = outputpath
     del_x_signs = bpy.context.scene.vloutputs_props.del_x_signs
@@ -549,7 +522,7 @@ def nodes_paths(layername,outputname,outputpath,del_signs):
         elif elem == "[Camera Name]":
             elem = scene.camera.name if scene.camera else ""
         elif elem == "[Layer Name]":
-            elem = bpy.context.view_layer.name
+            elem = layername # bpy.context.view_layer.name
         elif elem == "[User]":
             elem = os.getlogin()
         elif elem == "[Custom A]":
@@ -601,18 +574,14 @@ def nodes_paths(layername,outputname,outputpath,del_signs):
         complete_filepath = clean_filepath[del_x_signs:]
     else:
         complete_filepath = clean_filepath
-    scene.vloutputs_props.pathlength = len(complete_filepath)
     return complete_filepath
 
-def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_dict):
+def create_outputsNodes(selected_scene, selected_scene_layer_list, output_enabled_dict):
     ## variables
     selected_scene = selected_scene
     selected_scene_layer_list = selected_scene_layer_list
     output_enabled_dict = output_enabled_dict
-    if blender_5():
-        compo_tree = bpy.data.scenes[selected_scene.name].compositing_node_group
-    else:
-        compo_tree = bpy.data.scenes[selected_scene.name].node_tree
+    compo_tree = get_compositing_tree(bpy.data.scenes[selected_scene.name])
     output_corresponding = bpy.context.scene.vloutputs_props.output_corresponding
     clear_unusedSockets = bpy.context.scene.vloutputs_props.clear_unusedSockets
     outputs_reset_selection = bpy.context.scene.vloutputs_props.outputs_reset_selection
@@ -621,14 +590,6 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
     outputs_alpha_solo = bpy.context.scene.vloutputs_props.outputs_alpha_solo
     change_only_node_output = bpy.context.scene.vloutputs_props.change_only_node_output
     del_x_signs = bpy.context.scene.vloutputs_props.del_x_signs
-
-    if blender_5():
-        new_node_tree_name = f"Node_Tree-{selected_scene.name}"
-        if new_node_tree_name not in bpy.data.node_groups.keys():
-            bpy.ops.node.new_compositing_node_group(name = new_node_tree_name)
-        selected_scene.compositing_node_group = bpy.data.node_groups[new_node_tree_name]
-    else:
-        bpy.data.scenes[selected_scene.name].use_nodes = True
 
     # change names regarding the translation dic (Image=rgba, etc)
     outputs_output_corresponding_list = output_corresponding.split(',')
@@ -651,28 +612,30 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
     #         main_file_output = separator.join(main_file_output)
     #         main_file_output = f"{main_file_output}{separator}"
 
+    # if scene is on a video format, force use of fileformat_checkbox
+    if selected_scene.render.image_settings.file_format == 'FFMPEG':
+        fileformat_checkbox = True
+
     # check output image type
     if fileformat_checkbox:
         file_format = fileformat
-        media_type = "IMAGE"
     else:
         file_format = selected_scene.render.image_settings.file_format
-        if hasattr(selected_scene.render.image_settings, "media_type"):
-            media_type = selected_scene.render.image_settings.media_type
 
     ## create outputs nodes
-    iter_node = 0
-    for layer in selected_scene_layer_list: 
+    max_pathlength = 0
+    for layer in selected_scene_layer_list:
         # variables
         render_node_name = f"Render Layers - {layer.name}"
         output_node_name = f"File Output - {layer.name}"
 
         # update base_path
         layer_basepath = main_file_output + nodes_paths(layer.name,"",bpy.context.scene.vloutputs_props.basepath_previs,False)
-        
-        if bpy.context.scene.vloutputs_props.pathlength<=64:
+        max_pathlength = max(max_pathlength, len(layer_basepath))
+
+        if len(layer_basepath) <= MAX_PATH_LENGTH:
             # create output nodes if needed
-            if outputs_reset_selection!="ONLY UPDATE PATHS":
+            if outputs_reset_selection != "ONLY UPDATE PATHS":
                 # check if file output node exists
                 if output_node_name not in compo_tree.nodes:
                     # create file output
@@ -691,9 +654,8 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                 compo_tree.nodes[output_node_name].use_custom_color = True
                 compo_tree.nodes[output_node_name].color = compo_tree.nodes[render_node_name].color # give the same color as render layer node
                 compo_tree.nodes[output_node_name].mute = compo_tree.nodes[render_node_name].mute # check if mute
-                if blender_5():
-                    print("blender 5")
-                    compo_tree.nodes[output_node_name].format.media_type = media_type # only in blender >= 5
+                # media_type must be switched first, it filters the available file formats (node default is multilayer EXR)
+                compo_tree.nodes[output_node_name].format.media_type = 'MULTI_LAYER_IMAGE' if file_format == 'OPEN_EXR_MULTILAYER' else 'IMAGE'
                 compo_tree.nodes[output_node_name].format.file_format = file_format
                 if fileformat_checkbox:
                     if outputs_alpha_solo:
@@ -707,45 +669,39 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
             else:
                 new_output = False
 
-            # blender 5 
-            if hasattr(compo_tree.nodes[output_node_name],"file_name"):
-                file_name = layer_basepath.split("/")[-1]
-                layer_basepath = layer_basepath.replace(file_name,"")
-                compo_tree.nodes[output_node_name].file_name = file_name
-
             #print(f"{new_output=}")
 
             # update output node path (different from output names !)
-            if blender_5:
-                if hasattr(compo_tree.nodes[output_node_name], "directory"):
-                    compo_tree.nodes[output_node_name].directory = f"{layer_basepath}"
-            else:
-                compo_tree.nodes[output_node_name].base_path = f"{layer_basepath}"
+            compo_tree.nodes[output_node_name].directory = f"{layer_basepath}"
+            compo_tree.nodes[output_node_name].file_name = "" # file names are fully composed by the output items names
 
             output_enabled_list = output_enabled_dict[render_node_name]
             f"{output_enabled_list=}"
             ## create inputs in file outputs node regarding view layer
             if new_output or outputs_reset_selection == "ONLY UPDATE LINKS":
-                if blender_5:
-                    if hasattr(compo_tree.nodes[output_node_name], "file_output_items"):
-                        compo_tree.nodes[output_node_name].file_output_items.clear()
-                else:
-                    compo_tree.nodes[output_node_name].inputs.clear()
-
+                compo_tree.nodes[output_node_name].file_output_items.clear()
                 for output in output_enabled_list:
                     output_slot = output
+                    # # check if user wants to change the name
+                    # if output in outputs_output_corresponding_dict.keys():
+                    #     output = outputs_output_corresponding_dict[output]
+                    # create the outputs paths regarding user fields
                     vloutput_path = nodes_paths(layer.name, output, bpy.context.scene.vloutputs_props.subpath_previs, True)
+                    #print(f"{vloutput_path=}")
+
+                    # check if user wants to change the string
+                    # for string in outputs_output_corresponding_dict.keys():
+                    #     if string in vloutput_path :
+                    #         vloutput_path = vloutput_path.replace(string,outputs_output_corresponding_dict.get(string))
+                    #vloutput_path = vloutput_path[del_x_signs:]
                     input_slot = vloutput_path
-
-                    if blender_5:
-                        if hasattr(compo_tree.nodes[output_node_name], "file_output_items"):
-                            compo_tree.nodes[output_node_name].file_output_items.new("RGBA", input_slot)
-                    else:
-                        compo_tree.nodes[output_node_name].layer_slots.new(input_slot)
-
-                    if bpy.context.scene.vloutputs_props.pathlength <= 64:
+                    max_pathlength = max(max_pathlength, len(layer_basepath) + len(vloutput_path))
+                    compo_tree.nodes[output_node_name].file_output_items.new('RGBA', input_slot)
+                    # link by index : socket names are truncated to 63 characters, a name lookup fails on longer paths
+                    item_index = len(compo_tree.nodes[output_node_name].file_output_items) - 1
+                    if len(layer_basepath) + len(vloutput_path) <= MAX_PATH_LENGTH:
                         if bpy.context.scene.vloutputs_props.outputs_alpha_solo == True or bpy.context.scene.vloutputs_props.outputs_alpha_solo == False and output != "Alpha":
-                            compo_tree.links.new(compo_tree.nodes[render_node_name].outputs[output_slot],compo_tree.nodes[output_node_name].inputs[input_slot])
+                            compo_tree.links.new(compo_tree.nodes[render_node_name].outputs[output_slot],compo_tree.nodes[output_node_name].inputs[item_index])
             
             # update outputs slots names
             if outputs_reset_selection=="ONLY UPDATE PATHS":
@@ -756,49 +712,45 @@ def create_outputsNodes(selected_scene,selected_scene_layer_list,output_enabled_
                     #     input_slot = outputs_output_corresponding_dict[input_slot]
                     # create the outputs paths regarding user fields
                     vloutput_path = nodes_paths(layer.name,input_slot,bpy.context.scene.vloutputs_props.subpath_previs,True)
-                    # check if user wants to change the string
-                    # for string in outputs_output_corresponding_dict.keys():
-                    #     if string in vloutput_path :
-                    #         vloutput_path = vloutput_path.replace(string,outputs_output_corresponding_dict.get(string))
-                    #vloutput_path = vloutput_path[del_x_signs:]
+                    max_pathlength = max(max_pathlength, len(layer_basepath) + len(vloutput_path))
                     # change the name
                     if bpy.context.scene.vloutputs_props.outputs_alpha_solo == False and input_slot != "Alpha":
-                        compo_tree.nodes[output_node_name].file_slots[iter].path = vloutput_path
+                        compo_tree.nodes[output_node_name].file_output_items[iter].name = vloutput_path
                         iter += 1
                     elif input_slot == "Alpha":
                         iter += 1
 
             # update base path (from scene output)
-            if blender_5:
-                base_path = compo_tree.nodes[output_node_name].directory
-            else:
-                base_path = compo_tree.nodes[output_node_name].base_path
-            
+            base_path = compo_tree.nodes[output_node_name].directory
             #print(f"{base_path=}")
             if change_only_node_output == False:
                 for string in outputs_output_corresponding_dict.keys():
                     if string in base_path :
-                        compo_tree.nodes[output_node_name].base_path = base_path.replace(string,outputs_output_corresponding_dict.get(string))
+                        compo_tree.nodes[output_node_name].directory = base_path.replace(string,outputs_output_corresponding_dict.get(string))
 
 
             # clean unused output
             if clear_unusedSockets:
-                for input in compo_tree.nodes[output_node_name].inputs:
-                    if len(input.links) == 0:
-                        compo_tree.nodes[output_node_name].inputs.remove(input)
-            
-                #{outputs_prefix}
+                output_node = compo_tree.nodes[output_node_name]
+                # input sockets are generated from file_output_items, one per item in the same order
+                for index in reversed(range(len(output_node.file_output_items))):
+                    if len(output_node.inputs[index].links) == 0:
+                        output_node.file_output_items.remove(output_node.file_output_items[index])
+        else:
+            print(f"{ADDON_NAME}: skipped layer '{layer.name}', output path too long ({len(layer_basepath)} on {MAX_PATH_LENGTH})")
+
+    bpy.context.scene.vloutputs_props.pathlength = max_pathlength
 
 
-### create operators ###        
+# region create operators
 class VLOUTPUT_OT_createnodesoutput(bpy.types.Operator):
     bl_idname = "vloutputs.createnodesoutput"
-    bl_label = Addon_Name + "create files output"
+    bl_label = ADDON_NAME + "create files output"
     bl_description = "create files output node in compositing module for each view layer"
     bl_options = {"REGISTER", "UNDO"}
     
     def execute(self, context):
-        print(f"\n {separator} Begin {Addon_Name} {separator} \n")
+        print(f"\n {SEPARATOR} Begin {ADDON_NAME} {SEPARATOR} \n")
 
         sort_option = bpy.context.scene.vloutputs_props.outputs_sort
 
@@ -823,51 +775,39 @@ class VLOUTPUT_OT_createnodesoutput(bpy.types.Operator):
         #print(f"{scenes_list=}")
         # process
         for scene in scenes_list:
-            if blender_5():
-                new_node_tree_name = f"Node_Tree-{scene.name}"
-                if new_node_tree_name not in bpy.data.node_groups.keys():
-                    bpy.ops.node.new_compositing_node_group(name = new_node_tree_name)
-                scene.compositing_node_group = bpy.data.node_groups[new_node_tree_name]
-            else:
-                scene.use_nodes = True
-            if precomp_scene_suffixe not in bpy.context.scene.name:
+            if PRECOMP_SCENE_SUFFIXE not in bpy.context.scene.name:
                 if scene.vloutputs_props.outputs_reset_selection == "RESET ALL TREE":
-                    if blender_5():
-                        scene.compositing_node_group.nodes.clear()
-                    else:
-                        scene.node_tree.nodes.clear()
-                    
+                    get_compositing_tree(scene).nodes.clear()
                 # list all render layers
-                selected_scene_layer_list = list_renderlayers(work_scene,sort_option)
+                selected_scene_layer_list = list_renderlayers(work_scene, sort_option)
                 # create render layers
-                output_enabled_dict = create_renderlayers_nodes(work_scene,selected_scene_layer_list)
+                output_enabled_dict = create_renderlayers_nodes(work_scene, selected_scene_layer_list)
                 # create output nodes
-                create_outputsNodes(work_scene,selected_scene_layer_list,output_enabled_dict)
-                bpy.context.window.scene = work_scene # switch back to user scene work
+                create_outputsNodes(work_scene, selected_scene_layer_list, output_enabled_dict)
+                if bpy.context.window: # no window in background mode
+                    bpy.context.window.scene = work_scene # switch back to user scene work
                 #print(" --- scene finished --- ")
 
             # use a user script if wanted
             if bpy.context.scene.vloutputs_props.postscript_checkbox:
                 exec(bpy.context.scene.vloutputs_props.postscript.as_string())
 
-        print(f"\n {separator} {Addon_Name} Finished {separator} \n")
+        print(f"\n {SEPARATOR} {ADDON_NAME} Finished {SEPARATOR} \n")
         return {"FINISHED"}
 
 class VLOUTPUT_OT_dellastcharacter(bpy.types.Operator):
-    bl_idname = 'vloutputs.dellastcharacter'
+    bl_idname = "vloutputs.dellastcharacter"
     bl_label = "Delete Last Character"
     bl_options = {"REGISTER", "UNDO"}
-    
+
     def execute(self, context):
         # subpath_previs = context.scene.vloutputs_props.subpath_previs
         # if subpath_previs != "":
         #     output_split = subpath_previs.split("**")
         #     context.scene.vloutputs_props.subpath_previs = "**".join(output_split[:-1])
 
-
-
         vloutputs_props = context.scene.vloutputs_props
-        
+
         if vloutputs_props.path_to_change == "Base Path":
             if vloutputs_props.basepath_previs != "":
                 output_split = vloutputs_props.basepath_previs.split("**")
@@ -880,7 +820,7 @@ class VLOUTPUT_OT_dellastcharacter(bpy.types.Operator):
 
         return {"FINISHED"}
 
-# Generic operator for adding characters
+# region Generic operator for adding characters
 class VLOUTPUT_OT_add_character_enum(bpy.types.Operator):
     bl_idname = 'vloutputs.add_character_enum'
     bl_label = "Add Character"
@@ -900,18 +840,105 @@ class VLOUTPUT_OT_add_character_enum(bpy.types.Operator):
             context.scene.vloutputs_props.basepath_previs += f"**{self.character}"
         elif context.scene.vloutputs_props.path_to_change == "Subpath": 
             context.scene.vloutputs_props.subpath_previs += f"**{self.character}"
-      
+
+        return {"FINISHED"}
+
+# region copy / paste path templates
+TEMPLATE_CLIPBOARD_KEY = "vloutputs_path_templates"
+
+# (clipboard key, label, owner getter, attribute name)
+TEMPLATE_ITEMS = (
+    ("render_filepath", "Scene Output", lambda scene: scene.render, "filepath"),
+    ("basepath", "Base Path", lambda scene: scene.vloutputs_props, "basepath_previs"),
+    ("subpath", "Subpath", lambda scene: scene.vloutputs_props, "subpath_previs"),
+)
+
+def template_display(template):
+    # same readable form as in the panel
+    return template.replace("**", "") if template else "(empty)"
+
+class VLOUTPUT_OT_copy_path_templates(bpy.types.Operator):
+    bl_idname = 'vloutputs.copy_path_templates'
+    bl_label = "Copy Path Templates"
+    bl_description = "Copy scene output path, base path and subpath templates to the clipboard, to paste them in another shot"
+
+    def execute(self, context):
+        templates = {key: getattr(owner(context.scene), attr) for key, _label, owner, attr in TEMPLATE_ITEMS}
+        context.window_manager.clipboard = json.dumps({TEMPLATE_CLIPBOARD_KEY: templates})
+        self.report({'INFO'}, "Scene output, base path and subpath templates copied")
+        return {"FINISHED"}
+
+class VLOUTPUT_OT_paste_path_templates(bpy.types.Operator):
+    bl_idname = 'vloutputs.paste_path_templates'
+    bl_label = "Paste Path Templates"
+    bl_description = "Paste scene output path, base path and/or subpath templates from the clipboard"
+    bl_options = {"REGISTER", "UNDO"}
+
+    use_render_filepath: bpy.props.BoolProperty(name="Scene Output", default=True, options={'SKIP_SAVE'})
+    use_basepath: bpy.props.BoolProperty(name="Base Path", default=True, options={'SKIP_SAVE'})
+    use_subpath: bpy.props.BoolProperty(name="Subpath", default=True, options={'SKIP_SAVE'})
+    new_render_filepath: bpy.props.StringProperty(options={'SKIP_SAVE', 'HIDDEN'})
+    new_basepath: bpy.props.StringProperty(options={'SKIP_SAVE', 'HIDDEN'})
+    new_subpath: bpy.props.StringProperty(options={'SKIP_SAVE', 'HIDDEN'})
+
+    def invoke(self, context, event):
+        try:
+            data = json.loads(context.window_manager.clipboard)[TEMPLATE_CLIPBOARD_KEY]
+            if not isinstance(data, dict):
+                raise TypeError
+        except (ValueError, TypeError, KeyError):
+            self.report({'WARNING'}, "No path templates in clipboard (use copy button first)")
+            return {"CANCELLED"}
+
+        for key, _label, owner, attr in TEMPLATE_ITEMS:
+            current = getattr(owner(context.scene), attr)
+            # keep current value for items missing from the clipboard
+            new = data.get(key, current)
+            setattr(self, f"new_{key}", new)
+            # pre-check only what would actually change
+            setattr(self, f"use_{key}", new != current)
+        return context.window_manager.invoke_props_dialog(self, width=600, confirm_text="Paste")
+
+    def draw(self, context):
+        layout = self.layout
+        for key, _label, owner, attr in TEMPLATE_ITEMS:
+            current = getattr(owner(context.scene), attr)
+            new = getattr(self, f"new_{key}")
+            box = layout.box()
+            row = box.row()
+            row.prop(self, f"use_{key}")
+            if current == new:
+                row.label(text="identical", icon='CHECKMARK')
+            col = box.column()
+            col.active = getattr(self, f"use_{key}")
+            split = col.split(factor=.12)
+            split.label(text="Current:")
+            split.label(text=template_display(current))
+            split = col.split(factor=.12)
+            split.label(text="New:")
+            split.label(text=template_display(new))
+
+    def execute(self, context):
+        replaced = []
+        for key, label, owner, attr in TEMPLATE_ITEMS:
+            if getattr(self, f"use_{key}"):
+                setattr(owner(context.scene), attr, getattr(self, f"new_{key}"))
+                replaced.append(label)
+        if not replaced:
+            self.report({'INFO'}, "Nothing pasted")
+            return {"CANCELLED"}
+        self.report({'INFO'}, f"Pasted: {', '.join(replaced)}")
         return {"FINISHED"}
 
 class VLOUTPUT_OT_createprecomp(bpy.types.Operator):
     bl_idname = "vloutputs.createprecomp"
-    bl_label = Addon_Name + "Create Pre-Comp Tree scene"
-    bl_description = "create a pre compositing scene from render layer in scenes. \n /!\ You need to have render once at least one frame per layer to make it works ! /!\ "
+    bl_label = ADDON_NAME + "Create Pre-Comp Tree scene"
+    bl_description = "create a pre compositing scene from render layer in scenes. \n /!\\ You need to have render once at least one frame per layer to make it works ! /!\\ "
     bl_options = {"REGISTER", "UNDO"}
-    
+
     def execute(self, context):
-        print(f"\n {separator} Begin {Addon_Name} {separator} \n")
-        
+        print(f"\n {SEPARATOR} Begin {ADDON_NAME} {SEPARATOR} \n")
+
         work_scene = bpy.context.scene
         sort_option = work_scene.vloutputs_props.outputs_sort
         precomp_bg_under = work_scene.vloutputs_props.precomp_bg_under
@@ -935,16 +962,7 @@ class VLOUTPUT_OT_createprecomp(bpy.types.Operator):
         # process
         for scene in scenes_list:
             scene_name = scene.name
-            if blender_5():
-                new_node_tree_name = f"Node_Tree-{scene.name}"
-                if new_node_tree_name not in bpy.data.node_groups.keys():
-                    bpy.ops.node.new_compositing_node_group(name = new_node_tree_name)
-                scene.compositing_node_group = bpy.data.node_groups[new_node_tree_name]
-                #node_tree = selected_scene.compositing_node_group
-                node_tree = bpy.data.node_groups[new_node_tree_name]
-            else:
-                bpy.data.scenes[scene_name].use_nodes = True
-                node_tree = selected_scene.node_tree
+            node_tree = get_compositing_tree(bpy.data.scenes[scene_name])
             # if len(node_tree.nodes)==2 : # in case of it's a new node tree, renderlayer + composite node are in
             #     node_tree.nodes.clear()
             # if bpy.context.scene.vloutputs_props.outputs_reset_selection == "RESET ALL TREE":
@@ -1024,14 +1042,17 @@ class VLOUTPUT_OT_createprecomp(bpy.types.Operator):
                 iter+=1
             #print(f"alpha nodes created : {node_alphaOver_list}")
             
-            # create final composite node
-            if "Composite" in node_tree.nodes.keys():
-                    node_tree.nodes.remove(node_tree.nodes["Composite"])
+            # create final group output node (Composite node was removed in Blender 5.0)
+            if "Group Output" in node_tree.nodes.keys():
+                    node_tree.nodes.remove(node_tree.nodes["Group Output"])
             if "Viewer" in node_tree.nodes.keys():
                 node_tree.nodes.remove(node_tree.nodes["Viewer"])
-            
+
             if len(renderLayer_nodes_list)>0: # check lengh of list to avoid errors
-                node_composite = node_tree.nodes.new(type="CompositorNodeComposite").name
+                # the group output node needs an Image socket on the node group interface
+                if not any(item.item_type == 'SOCKET' and item.in_out == 'OUTPUT' for item in node_tree.interface.items_tree):
+                    node_tree.interface.new_socket(name='Image', in_out='OUTPUT', socket_type='NodeSocketColor')
+                node_composite = node_tree.nodes.new(type="NodeGroupOutput").name
                 node_composite_named = f"{node_composite}{name_suffix}"
                 node_tree.nodes[node_composite].name = node_composite_named
                 node_tree.nodes[node_composite_named].location = (location_x, 100)
@@ -1047,7 +1068,7 @@ class VLOUTPUT_OT_createprecomp(bpy.types.Operator):
         # clean useless nodes
         for node in node_tree.nodes:
             input_used = 0
-            if node.type == "ALPHAOVER" or node.type == "COMPOSITE" or node.type == "VIEWER":
+            if node.type == "ALPHAOVER" or node.type == "GROUP_OUTPUT" or node.type == "VIEWER":
                 for node_input in  node.inputs:
                     if node_input.is_linked == True:
                         input_used += 1
@@ -1058,14 +1079,14 @@ class VLOUTPUT_OT_createprecomp(bpy.types.Operator):
         if bpy.context.scene.vloutputs_props.precomp_postscript_checkbox:
             exec(bpy.context.scene.vloutputs_props.precomp_postscript.as_string())
 
-        #print(iter_node)
-        bpy.context.window.scene = work_scene
+        if bpy.context.window: # no window in background mode
+            bpy.context.window.scene = work_scene
         
-        #print(f"{Addon_Name} done on : {nodes_created_list} \n")
-        print(f"\n {separator} {Addon_Name} Finished {separator} \n")
+        #print(f"{ADDON_NAME} done on : {nodes_created_list} \n")
+        print(f"\n {SEPARATOR} {ADDON_NAME} Finished {SEPARATOR} \n")
         return {"FINISHED"}
 
-# list all classes
+# region register
 classes = (
     VLOUTPUT_Preferences,
     VLOUTPUT_properties,
@@ -1076,18 +1097,17 @@ classes = (
     VLOUTPUT_OT_createnodesoutput,
     VLOUTPUT_OT_dellastcharacter,
     VLOUTPUT_OT_add_character_enum,
+    VLOUTPUT_OT_copy_path_templates,
+    VLOUTPUT_OT_paste_path_templates,
     VLOUTPUT_OT_createprecomp,
     )
 
-# register classes
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.types.Scene.vloutputs_props = bpy.props.PointerProperty (type = VLOUTPUT_properties)
 
-#unregister classes 
-def unregister():    
+def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.vloutputs_props
-        
