@@ -1,6 +1,6 @@
 # What is View Layers Toolbox ?
 
-It's a bunch of tools which helps you to manage your view layers, espacially with rendering
+It's a bunch of tools which helps you to manage your view layers, especially with rendering
 
 ![image](https://github.com/user-attachments/assets/c833a22e-f1b9-4dbd-a675-118c0f9614fc)
 
